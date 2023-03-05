@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use super::loader::Loader;
+use super::{loader::Loader, loader_off::LoaderOff};
 
 #[derive(Clone)]
 struct LoaderEntry {
@@ -49,6 +49,7 @@ type LoaderList = BinaryHeap<LoaderEntry>;
 /// A map of loaders
 type LoaderMap = HashMap<String, LoaderList>;
 
+/// The manager contains a list of loaders which can be searched by mime-types or file extensions.
 pub struct Manager {
     /// The internal list of all loaders
     loader: Vec<Rc<dyn Loader>>,
@@ -66,6 +67,7 @@ impl Manager {
         let mut result = Self::new_empty();
 
         // register loaders here...
+        result.register_loader(Box::new(LoaderOff::new()));
 
         result
     }
@@ -204,7 +206,7 @@ mod tests {
         fn read_file(
             &self,
             _: &mut dyn std::io::Read,
-        ) -> Result<crate::structure::cad_data::CADData, crate::error::Error> {
+        ) -> Result<crate::structure::CADData, crate::Error> {
             todo!()
         }
 
@@ -253,5 +255,20 @@ mod tests {
         );
 
         assert_eq!(m.get_loader_list().len(), 2);
+    }
+
+    #[test]
+    fn test_if_loaders_are_registered() {
+        let manager = Manager::new();
+        let loader = manager.get_loader_by_extension("off").unwrap();
+        assert_eq!(loader.get_name(), "Object File Format");
+
+        let loader = manager.get_loader_by_mime_type("model/vnd.off").unwrap();
+        assert_eq!(loader.get_name(), "Object File Format");
+
+        let loaders = manager.get_loader_list();
+        assert_eq!(loaders.len(), 1);
+        let loader = loaders.first().unwrap();
+        assert_eq!(loader.get_name(), "Object File Format");
     }
 }

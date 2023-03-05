@@ -1,8 +1,8 @@
 use crate::error::Error;
 
-use super::{vertices::Vertices, primitives::Primitives};
+use super::{primitives::Primitives, vertices::Vertices};
 
-/// A single tessellation.
+/// A mesh is a tessellated geometry consisting of vertices and primitives.
 pub struct Mesh {
     vertices: Vertices,
     primitives: Primitives,
@@ -10,7 +10,7 @@ pub struct Mesh {
 
 impl Mesh {
     /// Creates a new mesh object from the given vertices and primitives.
-    /// 
+    ///
     /// # Arguments
     /// * `vertices` - The vertices of the mesh
     /// * `primitives` - The mesh primitives
@@ -18,10 +18,14 @@ impl Mesh {
         match primitives.max_index() {
             Some(m) => {
                 if m as usize >= vertices.len() {
-                    return Err(Error::Indices(format!("Indices reference vertex {}, but only got {} vertices", m, vertices.len())));
+                    return Err(Error::Indices(format!(
+                        "Indices reference vertex {}, but only got {} vertices",
+                        m,
+                        vertices.len()
+                    )));
                 }
             }
-            None => {},
+            None => {}
         }
 
         Ok(Self {

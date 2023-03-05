@@ -1,5 +1,7 @@
 use std::fmt::Debug;
 
+use nalgebra_glm::Vec3;
+
 /// The trait for components inside attributes.
 pub trait Component: Sized + Default + Clone + Copy + PartialEq + Debug {
     /// Linear interpolation operator for the component. Interpolates between self and rhs.
@@ -25,28 +27,26 @@ impl Component for Float {
 }
 
 /// A single point in 3D.
-#[derive(Clone, Copy, Default, Debug)]
-pub struct Point3D {
-    pub v: [f32; 3],
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Point3D(pub Vec3);
+
+impl Point3D {
+    pub fn new(x: f32, y: f32, z: f32) -> Self {
+        Self(Vec3::new(x, y, z))
+    }
 }
 
-impl PartialEq for Point3D {
+impl Default for Point3D {
     #[inline]
-    fn eq(&self, other: &Self) -> bool {
-        self.v[0] == other.v[0] && self.v[1] == other.v[1] && self.v[2] == other.v[2]
+    fn default() -> Self {
+        Self(Vec3::new(0f32, 0f32, 0f32))
     }
 }
 
 impl Component for Point3D {
     #[inline]
     fn interpolate(&self, rhs: &Self, f: f32) -> Self {
-        Self {
-            v: [
-                self.v[0] * (1f32 - f) + f * rhs.v[0],
-                self.v[1] * (1f32 - f) + f * rhs.v[1],
-                self.v[2] * (1f32 - f) + f * rhs.v[2],
-            ],
-        }
+        Self(self.0 * (1f32 - f) + rhs.0 * f)
     }
 }
 
@@ -69,20 +69,11 @@ mod tests {
 
     #[test]
     fn test_point_interpolate() {
-        let a: Point3D = Point3D {
-            v: [-1f32, -4f32, -8f32],
-        };
-        let b: Point3D = Point3D {
-            v: [1f32, 4f32, 8f32],
-        };
+        let a: Point3D = Point3D::new(-1f32, -4f32, -8f32);
+        let b: Point3D = Point3D::new(1f32, 4f32, 8f32);
 
         assert_eq!(a.interpolate(&b, 0f32), a);
         assert_eq!(a.interpolate(&b, 1f32), b);
-        assert_eq!(
-            a.interpolate(&b, 0.5f32),
-            Point3D {
-                v: [0f32, 0f32, 0f32]
-            }
-        );
+        assert_eq!(a.interpolate(&b, 0.5f32), Point3D::new(0f32, 0f32, 0f32));
     }
 }

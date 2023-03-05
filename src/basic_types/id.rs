@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicU64, Ordering};
 
+/// General ID type to identify and distinguish elements that can be multi instantiated.
 pub type ID = u64;
 
 pub struct IDCounter {
@@ -18,7 +19,7 @@ impl IDCounter {
     pub fn gen(&self) -> ID {
         let id = self.counter.fetch_add(1u64, Ordering::SeqCst);
         id
-    } 
+    }
 }
 
 #[cfg(test)]

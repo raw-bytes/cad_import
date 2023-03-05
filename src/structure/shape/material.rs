@@ -1,8 +1,8 @@
-use crate::basic_types::color::{RGB};
+use crate::basic_types::{Color, RGB};
 
 pub enum Material {
     None,
-    PhongMaterial(PhongMaterialData)
+    PhongMaterial(PhongMaterialData),
 }
 
 impl Default for Material {
