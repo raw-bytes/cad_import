@@ -28,7 +28,7 @@
 //! In order to load a specific file see the following code
 //! ```rust
 //! use cad_import::loader::Manager;
-//! use std::fs::File;
+//! use std::{fs::File, path::Path};
 //! use std::env;
 //!
 //! fn main() {
@@ -43,10 +43,9 @@
 //!     if args.len() != 2 {
 //!       println!("USAGE: <FILE-PATH>");
 //!     } else {
-//!         let file_path = &args[1];
-//!         let mut reader = File::open(file_path).unwrap();
+//!         let file_path = Path::new(&args[1]);
 //!
-//!         let cad_data = loader.read_file(&mut reader);
+//!         let cad_data = loader.read_file(&file_path);
 //!     }
 //! }
 //! ```

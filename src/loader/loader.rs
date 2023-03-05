@@ -1,4 +1,8 @@
+use std::path::Path;
+
 use crate::{error::Error, structure::CADData};
+
+use super::{FileResource, Resource};
 
 /// The trait for a registered loader.
 pub trait Loader {
@@ -20,5 +24,15 @@ pub trait Loader {
     ///
     /// # Arguments
     /// * `reader` - The reader from which the loader will read the cad data.
-    fn read_file(&self, reader: &mut dyn std::io::Read) -> Result<CADData, Error>;
+    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error>;
+
+    /// Reads the CAD data from the given path. If something happens, the loader will return
+    /// a error message.
+    ///
+    /// # Arguments
+    /// * `p` - The path from which the loader will read the cad data.
+    fn read_file(&self, p: &Path) -> Result<CADData, Error> {
+        let f = FileResource::new(p.to_owned());
+        self.read(&f)
+    }
 }

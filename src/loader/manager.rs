@@ -165,6 +165,8 @@ impl Manager {
 
 #[cfg(test)]
 mod tests {
+    use crate::{loader::Resource, structure::CADData, Error};
+
     use super::*;
 
     struct FakeLoader {
@@ -203,10 +205,7 @@ mod tests {
             self.priority
         }
 
-        fn read_file(
-            &self,
-            _: &mut dyn std::io::Read,
-        ) -> Result<crate::structure::CADData, crate::Error> {
+        fn read(&self, _resource: &dyn Resource) -> Result<CADData, Error> {
             todo!()
         }
 
