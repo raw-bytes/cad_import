@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - New resource interface for accessing resources
 
+### Changed
+- Changed the resource extension handling
+
 ## [0.2.1] - 2023-02-22
 
 ### Changed

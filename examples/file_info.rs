@@ -1,7 +1,7 @@
-use std::{collections::HashSet, env, path::Path, rc::Rc};
+use std::{collections::HashSet, env, path::Path};
 
 use cad_import::{
-    loader::{FileResource, Loader, Manager},
+    loader::{FileResource, Manager},
     structure::{CADData, Node},
     ID,
 };
@@ -17,24 +17,20 @@ fn usage() {
     );
 }
 
-fn find_loader(
-    manager: &Manager,
-    input_file: &Path,
-    mime_type: Option<&str>,
-) -> Option<Rc<dyn Loader>> {
+fn determine_mime_types(manager: &Manager, input_file: &Path, mime_type: Option<&str>) -> Vec<String> {
     match mime_type {
-        Some(mime_type) => manager.get_loader_by_mime_type(mime_type),
+        Some(m) => vec![m.to_owned()],
         None => match input_file.extension() {
             Some(ext) => match ext.to_str() {
-                Some(ext) => manager.get_loader_by_extension(ext),
+                Some(ext) => manager.get_mime_types_for_extension(ext),
                 None => {
                     eprintln!("Input file has invalid extension");
-                    None
+                    Vec::new()
                 }
             },
             None => {
                 eprintln!("Input file has no extension");
-                None
+                Vec::new()
             }
         },
     }
@@ -89,7 +85,13 @@ fn dump_info(cad_data: &CADData) {
 fn run_program(input_file: &Path, mime_type: Option<&str>) -> bool {
     let manager = Manager::new();
 
-    let loader = find_loader(&manager, input_file, mime_type);
+    let mime_types = determine_mime_types(&manager, input_file, mime_type);
+    if mime_types.is_empty() {
+        eprintln!("Could not determine the mime type");
+        return false;
+    }
+
+    let loader = manager.get_loader_by_mime_type(&mime_types[0]);
     let loader = match loader {
         None => {
             eprintln!("Cannot find loader");
@@ -99,7 +101,7 @@ fn run_program(input_file: &Path, mime_type: Option<&str>) -> bool {
     };
 
     println!("Reading file {:?}...", input_file);
-    let file_resource = FileResource::new(input_file.to_owned());
+    let file_resource = FileResource::new(input_file.to_owned(), &mime_types[0]);
 
     let cad_data = match loader.read(&file_resource) {
         Ok(cad_data) => cad_data,

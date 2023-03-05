@@ -1,9 +1,9 @@
 use std::{
-    collections::{BinaryHeap, HashMap},
+    collections::{BinaryHeap, HashMap, BTreeSet},
     rc::Rc,
 };
 
-use super::{loader::Loader, loader_off::LoaderOff};
+use super::{loader::Loader, loader_off::LoaderOff, ExtensionMap};
 
 #[derive(Clone)]
 struct LoaderEntry {
@@ -54,8 +54,8 @@ pub struct Manager {
     /// The internal list of all loaders
     loader: Vec<Rc<dyn Loader>>,
 
-    /// Map from file extensions to a list of loaders
-    map_ext: LoaderMap,
+    /// Map of all extensions supported by the manager
+    map_ext: ExtensionMap,
 
     /// Map from file mime types to a list of loaders
     map_mime: LoaderMap,
@@ -76,7 +76,7 @@ impl Manager {
     pub fn new_empty() -> Self {
         Self {
             loader: Vec::new(),
-            map_ext: HashMap::new(),
+            map_ext: ExtensionMap::new(),
             map_mime: HashMap::new(),
         }
     }
@@ -86,7 +86,7 @@ impl Manager {
     /// # Arguments
     /// * `loader` - The loader to register.
     pub fn register_loader(&mut self, loader: Box<dyn Loader>) {
-        let extensions = loader.as_ref().get_extensions();
+        let mut ext_map = loader.as_ref().get_extensions_mime_type_map();
         let mime_types = loader.get_mime_types();
 
         // create reference counter of loader
@@ -96,14 +96,14 @@ impl Manager {
         // register loader in the general loader list
         self.loader.push(loader);
 
-        // register loader based on its extension
-        for ext in extensions.iter() {
-            let loader_list = self
+        // update extensions map
+        for (ext, new_mime_types) in ext_map.iter_mut() {
+            let mime_types = self
                 .map_ext
                 .entry(ext.clone())
-                .or_insert_with(|| LoaderList::new());
+                .or_insert_with(|| BTreeSet::new());
 
-            loader_list.push(loader_entry.clone());
+            mime_types.append(new_mime_types);
         }
 
         // register loader based on its mime type
@@ -117,23 +117,18 @@ impl Manager {
         }
     }
 
-    /// Tries to find a loader by its extension.
+    /// Tries to find mime_types associated to the given extension.
     ///
     /// # Arguments
     /// * `ext` - The extension of the loader without a preceding dot, e.g. "png".
-    pub fn get_loader_by_extension(&self, ext: &str) -> Option<Rc<dyn Loader>> {
+    pub fn get_mime_types_for_extension(&self, ext: &str) -> Vec<String> {
         let ext = ext.to_lowercase();
 
         match self.map_ext.get(&ext) {
             Some(lst) => {
-                let e = match lst.peek() {
-                    Some(l) => Some(l.loader.clone()),
-                    None => None,
-                };
-
-                e
+                Vec::from_iter(lst.iter().map(|s| s.clone()))
             }
-            None => None,
+            None => Vec::new(),
         }
     }
 
@@ -165,13 +160,15 @@ impl Manager {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+
     use crate::{loader::Resource, structure::CADData, Error};
 
     use super::*;
 
     struct FakeLoader {
         identifier: String,
-        extensions: Vec<String>,
+        map_ext: ExtensionMap,
         mime_types: Vec<String>,
         priority: u32,
     }
@@ -179,13 +176,13 @@ mod tests {
     impl FakeLoader {
         pub fn new(
             identifier: String,
-            extensions: Vec<String>,
+            map_ext: ExtensionMap,
             mime_types: Vec<String>,
             priority: u32,
         ) -> Self {
             Self {
                 identifier,
-                extensions,
+                map_ext,
                 mime_types,
                 priority,
             }
@@ -197,8 +194,8 @@ mod tests {
             self.mime_types.clone()
         }
 
-        fn get_extensions(&self) -> Vec<String> {
-            self.extensions.clone()
+        fn get_extensions_mime_type_map(&self) -> ExtensionMap {
+            self.map_ext.clone()
         }
 
         fn get_priority(&self) -> u32 {
@@ -220,36 +217,38 @@ mod tests {
 
         let l = FakeLoader::new(
             "loader1".to_owned(),
-            vec!["foobar".to_owned()],
+            BTreeMap::from([("foobar".to_owned(), BTreeSet::from(["foobar/x-test".to_owned()]))]),
             vec!["foobar/x-test".to_owned()],
             42,
         );
         m.register_loader(Box::new(l));
 
-        assert!(m.get_loader_by_extension("foobar").is_some());
-        assert!(m.get_loader_by_extension("FOobar").is_some());
-        assert!(m.get_loader_by_extension("FOobar2").is_none());
-        assert!(m.get_loader_by_extension("FOob").is_none());
+        assert_eq!(m.get_mime_types_for_extension("foobar"), ["foobar/x-test"]);
+        assert_eq!(m.get_mime_types_for_extension("FOobar"), ["foobar/x-test"]);
+        assert!(m.get_mime_types_for_extension("FOobar2").is_empty());
+        assert!(m.get_mime_types_for_extension("FOob").is_empty());
 
         let l2 = FakeLoader::new(
             "loader2".to_owned(),
-            vec!["foobar".to_owned()],
+            BTreeMap::from([("foobar".to_owned(), BTreeSet::from(["foobar/x-test".to_owned()]))]),
             vec!["foobar/x-test".to_owned()],
             43,
         );
 
         m.register_loader(Box::new(l2));
 
-        assert!(m.get_loader_by_extension("foobar").is_some());
-        assert!(m.get_loader_by_extension("FOobar").is_some());
-        assert!(m.get_loader_by_extension("FOobar2").is_none());
-        assert!(m.get_loader_by_extension("FOob").is_none());
+        assert_eq!(m.get_mime_types_for_extension("foobar"), ["foobar/x-test"]);
+        assert_eq!(m.get_mime_types_for_extension("FOobar"), ["foobar/x-test"]);
+        assert!(m.get_mime_types_for_extension("FOobar2").is_empty());
+        assert!(m.get_mime_types_for_extension("FOob").is_empty());
+
         assert_eq!(
-            m.get_loader_by_extension("foobar").unwrap().get_priority(),
+            m.get_loader_by_mime_type("foobar/x-test").unwrap().get_priority(),
             43
         );
+
         assert_eq!(
-            m.get_loader_by_extension("foobar").unwrap().get_name(),
+            m.get_loader_by_mime_type("foobar/x-test").unwrap().get_name(),
             "loader2"
         );
 
@@ -259,7 +258,10 @@ mod tests {
     #[test]
     fn test_if_loaders_are_registered() {
         let manager = Manager::new();
-        let loader = manager.get_loader_by_extension("off").unwrap();
+
+        let off_mime_types = manager.get_mime_types_for_extension("off");
+        assert_eq!(off_mime_types.len(), 1);
+        let loader = manager.get_loader_by_mime_type(&off_mime_types[0]).unwrap();
         assert_eq!(loader.get_name(), "Object File Format");
 
         let loader = manager.get_loader_by_mime_type("model/vnd.off").unwrap();
@@ -267,7 +269,28 @@ mod tests {
 
         let loaders = manager.get_loader_list();
         assert_eq!(loaders.len(), 1);
-        let loader = loaders.first().unwrap();
-        assert_eq!(loader.get_name(), "Object File Format");
+    }
+
+    #[test]
+    fn test_extension_map() {
+        let manager = Manager::new();
+
+        for loader in manager.get_loader_list() {
+            // create list of all mime types based on the extension map
+            let mut mime_types_set: BTreeSet<String> = BTreeSet::new();
+            let mut ext_map = loader.get_extensions_mime_type_map();
+            for m in ext_map.values_mut() {
+                mime_types_set.append(m);
+            }
+
+            let mut mime_types: Vec<String> = loader.get_mime_types();
+            mime_types.sort();
+
+            assert_eq!(mime_types.len(), mime_types_set.len());
+
+            for m in mime_types.iter() {
+                assert!(mime_types_set.contains(m));
+            }
+        }
     }
 }

@@ -3,7 +3,7 @@ use std::{
     io::{BufRead, BufReader, Error as IOError},
     iter::Peekable,
     rc::Rc,
-    str::{FromStr, SplitAsciiWhitespace},
+    str::{FromStr, SplitAsciiWhitespace}, collections::{BTreeMap, BTreeSet},
 };
 
 use crate::{
@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-use super::{loader::Loader, Resource};
+use super::{loader::{Loader, ExtensionMap}, Resource};
 
 use log::{debug, trace};
 
@@ -241,8 +241,12 @@ impl LoaderOff {
 }
 
 impl Loader for LoaderOff {
-    fn get_extensions(&self) -> Vec<String> {
-        vec!["off".to_owned()]
+    fn get_extensions_mime_type_map(&self) -> ExtensionMap {
+        let mut ext_map = BTreeMap::new();
+
+        ext_map.insert("off".to_owned(), BTreeSet::from(["model/vnd.off".to_owned()]));
+
+        ext_map
     }
 
     fn get_mime_types(&self) -> Vec<String> {
@@ -310,9 +314,13 @@ mod tests {
             Ok(Box::new(Cursor::new(self.data)))
         }
 
-        fn sub(&self, _s: &str) -> Result<Box<dyn Resource>, Error> {
+        fn sub(&self, _s: &str, _m: &str) -> Result<Box<dyn Resource>, Error> {
             let s = Self { data: self.data };
             Ok(Box::new(s))
+        }
+
+        fn get_mime_type(&self) -> String {
+            "".to_owned()
         }
     }
 

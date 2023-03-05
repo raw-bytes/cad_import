@@ -12,6 +12,7 @@ use super::Resource;
 /// A resource described by a file path.
 pub struct FileResource {
     p: PathBuf,
+    mime_type: String,
 }
 
 impl FileResource {
@@ -19,8 +20,8 @@ impl FileResource {
     ///
     /// # Arguments
     /// * `p` - The path to the file resource.
-    pub fn new(p: PathBuf) -> Self {
-        Self { p }
+    pub fn new(p: PathBuf, mime_type: &str) -> Self {
+        Self { p, mime_type: mime_type.to_owned() }
     }
 
     /// Returns the internally stored path as reference.
@@ -42,6 +43,10 @@ impl Debug for FileResource {
 }
 
 impl Resource for FileResource {
+    fn get_mime_type(&self) -> String {
+        self.mime_type.clone()
+    }
+
     fn open(&self) -> Result<Box<dyn Read>, Error> {
         match File::open(&self.p) {
             Ok(f) => Ok(Box::new(f)),
@@ -53,7 +58,7 @@ impl Resource for FileResource {
         }
     }
 
-    fn sub(&self, s: &str) -> Result<Box<dyn Resource>, Error> {
+    fn sub(&self, s: &str, mime_type: &str) -> Result<Box<dyn Resource>, Error> {
         let mut p = self.p.clone();
         p.pop();
         p.push(s);
@@ -63,7 +68,7 @@ impl Resource for FileResource {
             p2.push(c);
         }
 
-        Ok(Box::new(FileResource { p: p2 }))
+        Ok(Box::new(FileResource { p: p2, mime_type: mime_type.to_owned() }))
     }
 }
 
@@ -77,16 +82,20 @@ mod tests {
 
     #[test]
     fn test_sub() {
-        let f = FileResource::new(PathBuf::from_str("/path/to/file.txt").unwrap());
+        let f = FileResource::new(PathBuf::from_str("/path/to/file.txt").unwrap(), "text/plain");
+        assert_eq!(f.get_mime_type(), "text/plain");
         assert_eq!(f.to_string(), "/path/to/file.txt");
 
-        let f2 = f.sub("./foobar.txt").unwrap();
+        let f2 = f.sub("./foobar.txt", "text/plain").unwrap();
+        assert_eq!(f2.get_mime_type(), "text/plain");
         assert_eq!(f2.to_string(), "/path/to/foobar.txt");
 
-        let f2 = f.sub("foobar.txt").unwrap();
+        let f2 = f.sub("foobar.txt", "text/plain").unwrap();
+        assert_eq!(f2.get_mime_type(), "text/plain");
         assert_eq!(f2.to_string(), "/path/to/foobar.txt");
 
-        let f3 = f.sub("../fluff.txt").unwrap();
+        let f3 = f.sub("../fluff.txt", "text/plain").unwrap();
+        assert_eq!(f.get_mime_type(), "text/plain");
         assert_eq!(clean(f3.to_string()).to_str().unwrap(), "/path/fluff.txt");
     }
 }
