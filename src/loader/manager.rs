@@ -269,7 +269,7 @@ mod tests {
         assert_eq!(loader.get_name(), "Object File Format");
 
         let loaders = manager.get_loader_list();
-        assert_eq!(loaders.len(), 1);
+        assert_eq!(loaders.len(), 2);
     }
 
     #[test]
