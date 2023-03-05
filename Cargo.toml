@@ -15,6 +15,7 @@ categories = ["data-structures"]
 edition = "2021"
 
 [dependencies]
+gltf = "1.1"
 quick-error = "2.0"
 nalgebra-glm = "0.3"
 log = "0.4"
