@@ -1,4 +1,4 @@
-use crate::{error::Error, structure::cad_data::CADData};
+use crate::{error::Error, structure::CADData};
 
 /// The trait for a registered loader.
 pub trait Loader {

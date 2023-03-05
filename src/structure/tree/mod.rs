@@ -1,1 +1,3 @@
-pub mod node;
+mod node;
+
+pub use node::Node;

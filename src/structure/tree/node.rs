@@ -1,9 +1,13 @@
-use std::fmt::{Debug, Display};
+use std::{
+    fmt::{Debug, Display},
+    rc::Rc,
+};
 
 use nalgebra_glm::Mat4;
 
 use crate::{
-    structure::shape::shape::Shape, basic_types::id::{IDCounter, ID},
+    basic_types::{IDCounter, ID},
+    structure::Shape,
 };
 
 static ID_COUNTER: IDCounter = IDCounter::new();
@@ -13,7 +17,7 @@ pub struct Node {
     id: u64,
     label: String,
     transform: Option<Mat4>,
-    shapes: Vec<Shape>,
+    shapes: Vec<Rc<Shape>>,
     children: Vec<Node>,
 }
 
@@ -66,8 +70,13 @@ impl Node {
     ///
     /// # Arguments
     /// * `shape` - The shape to attach.
-    pub fn attach_shape(&mut self, shape: Shape) {
+    pub fn attach_shape(&mut self, shape: Rc<Shape>) {
         self.shapes.push(shape);
+    }
+
+    /// Returns a reference onto the internal stored shapes.
+    pub fn get_shapes(&self) -> &[Rc<Shape>] {
+        &self.shapes
     }
 
     /// Sets the given transformation for the node.
