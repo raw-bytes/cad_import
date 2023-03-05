@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unpublished]
 
+## [0.2.1] - 2023-02-22
+
+### Changed
+- Fixed changelog
+
+## [0.2.0] - 2023-02-22
+
 ### Added
 - Loader for the simple OFF (Object File Format) format 
 - More documentation and introduction examples
