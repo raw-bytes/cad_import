@@ -1,0 +1,19 @@
+[package]
+name = "cad_import"
+version = "0.1.0"
+readme = "README.md"
+license = "MIT"
+authors = ["sraesch"]
+
+description = "A simple library for importing CAD data from different formats into a uniform in-memory structure."
+documentation = "https://docs.rs/cad_import/"
+repository = "https://github.com/sraesch/cad_import"
+
+keywords = ["3D", "CAD", "import", "model", "scene"]
+categories = ["data-structures"]
+
+edition = "2021"
+
+[dependencies]
+quick-error = "2.0"
+nalgebra-glm = "0.3"
