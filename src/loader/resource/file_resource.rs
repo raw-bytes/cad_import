@@ -53,7 +53,7 @@ impl Resource for FileResource {
         }
     }
 
-    fn sub(&self, s: &str) -> Result<Self, Error> {
+    fn sub(&self, s: &str) -> Result<Box<dyn Resource>, Error> {
         let mut p = self.p.clone();
         p.pop();
         p.push(s);
@@ -63,7 +63,7 @@ impl Resource for FileResource {
             p2.push(c);
         }
 
-        Ok(FileResource { p: p2 })
+        Ok(Box::new(FileResource { p: p2 }))
     }
 }
 
@@ -87,6 +87,6 @@ mod tests {
         assert_eq!(f2.to_string(), "/path/to/foobar.txt");
 
         let f3 = f.sub("../fluff.txt").unwrap();
-        assert_eq!(clean(f3.get_path()).to_str().unwrap(), "/path/fluff.txt");
+        assert_eq!(clean(f3.to_string()).to_str().unwrap(), "/path/fluff.txt");
     }
 }

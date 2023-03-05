@@ -1,7 +1,7 @@
-use std::{collections::HashSet, env, fs::File, path::Path, rc::Rc};
+use std::{collections::HashSet, env, path::Path, rc::Rc};
 
 use cad_import::{
-    loader::{Loader, Manager},
+    loader::{FileResource, Loader, Manager},
     structure::{CADData, Node},
     ID,
 };
@@ -99,16 +99,9 @@ fn run_program(input_file: &Path, mime_type: Option<&str>) -> bool {
     };
 
     println!("Reading file {:?}...", input_file);
-    let mut reader = match File::open(input_file) {
-        Ok(file) => file,
-        Err(err) => {
-            eprintln!("Reading file {:?}...FAILED", input_file);
-            eprintln!("Error: {}", err);
-            return false;
-        }
-    };
+    let file_resource = FileResource::new(input_file.to_owned());
 
-    let cad_data = match loader.read_file(&mut reader) {
+    let cad_data = match loader.read(&file_resource) {
         Ok(cad_data) => cad_data,
         Err(err) => {
             eprintln!("Reading file {:?}...FAILED", input_file);

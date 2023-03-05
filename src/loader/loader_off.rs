@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-use super::loader::Loader;
+use super::{loader::Loader, Resource};
 
 use log::{debug, trace};
 
@@ -257,7 +257,8 @@ impl Loader for LoaderOff {
         1000
     }
 
-    fn read_file(&self, reader: &mut dyn std::io::Read) -> Result<CADData, Error> {
+    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+        let reader = resource.open().unwrap();
         let reader = BufReader::new(reader);
         let mut lines = reader.lines().enumerate();
 
@@ -276,9 +277,44 @@ impl Loader for LoaderOff {
 
 #[cfg(test)]
 mod tests {
+    use std::{fmt::Debug, io::Cursor};
+
     use nalgebra_glm::{cross, Vec3, U3};
 
     use super::*;
+
+    pub struct FakeResource {
+        data: &'static [u8],
+    }
+
+    impl FakeResource {
+        pub fn new(data: &'static [u8]) -> Self {
+            Self { data }
+        }
+    }
+
+    impl ToString for FakeResource {
+        fn to_string(&self) -> String {
+            "".to_owned()
+        }
+    }
+
+    impl Debug for FakeResource {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "")
+        }
+    }
+
+    impl Resource for FakeResource {
+        fn open(&self) -> Result<Box<dyn std::io::Read>, Error> {
+            Ok(Box::new(Cursor::new(self.data)))
+        }
+
+        fn sub(&self, _s: &str) -> Result<Box<dyn Resource>, Error> {
+            let s = Self { data: self.data };
+            Ok(Box::new(s))
+        }
+    }
 
     /// Computes the bounding volume for the given positions.
     fn compute_bbox(positions: &[Point3D]) -> (Vec3, Vec3) {
@@ -325,10 +361,11 @@ mod tests {
     fn test_cube() {
         let s = include_str!("test_data/cube.off");
 
-        let mut reader = BufReader::new(s.as_bytes());
+        let r = FakeResource::new(s.as_bytes());
+
         let loader = LoaderOff::new();
 
-        let cad_data = loader.read_file(&mut reader).unwrap();
+        let cad_data = loader.read(&r).unwrap();
         let root_node = cad_data.get_root_node();
         assert!(root_node.is_leaf());
 
