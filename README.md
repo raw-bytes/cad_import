@@ -6,5 +6,8 @@ The goals of this library is:
 - Simple design and supporting
 - Representation in uniform in-memory structure
 
+## Supported formats
+- Object File Format: Extensions=*.off, Mime-Types=model/vnd.off] (see https://segeval.cs.princeton.edu/public/off_format.html)
+
 ## Changelog
 For changes see [Change Log](./CHANGELOG.md)
