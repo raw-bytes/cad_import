@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unpublished]
 
+### Added
+- New resource interface for accessing resources
+
 ## [0.2.1] - 2023-02-22
 
 ### Changed
