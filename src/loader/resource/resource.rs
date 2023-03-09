@@ -1,4 +1,6 @@
-use std::{fmt::Debug, io::Read};
+use std::{fmt::Debug, io::{Read, Cursor}};
+
+use log::debug;
 
 use crate::Error;
 
@@ -18,4 +20,21 @@ pub trait Resource: Debug + ToString {
 
     /// Tries to open a reader to the currently specified resource.
     fn open(&self) -> Result<Box<dyn Read>, Error>;
+
+    /// Opens a reader to the specified resource and copies the content to an U8 buffer.
+    fn read_to_memory(&self) -> Result<Vec<u8>, Error> {
+        let mut buffer: Vec<u8> = Vec::new();
+
+            let mut writer = Cursor::new(&mut buffer);
+            let mut reader = self.open()?;
+            match std::io::copy(reader.as_mut(), &mut writer) {
+                Err(err) => {
+                    Err(Error::IO(format!("Failed copying {:?} to memory due to {}", self, err)))
+                }
+                Ok(l) => {
+                    debug!("Copied {} bytes to memory", l);
+                    Ok(buffer)
+                }
+            }
+    }
 }
