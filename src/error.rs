@@ -20,3 +20,9 @@ quick_error! {
         }
     }
 }
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Self {
+        Error::IO(format!("IO Error: {}", err))
+    }
+}
