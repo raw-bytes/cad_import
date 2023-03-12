@@ -1,20 +1,28 @@
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
+    fmt::Display,
     rc::Rc,
 };
 
 use gltf::{
-    buffer::Source, iter::Buffers, material::AlphaMode, mesh::Mode, Document, Gltf,
-    Material as GLTFMaterial, Mesh as GLTFMesh,
+    accessor::{DataType as GLTFDataType, Dimensions},
+    buffer::{Source, View},
+    iter::Buffers,
+    material::AlphaMode,
+    mesh::{iter::Attributes, Mode},
+    Accessor, Document, Gltf, Material as GLTFMaterial, Mesh as GLTFMesh,
+    Primitive as GLTFPrimitive, Semantic,
 };
 use log::{debug, warn};
 use nalgebra_glm::Vec3;
 
 use crate::{
     loader::{Loader, Resource},
-    structure::{CADData, Material, PhongMaterialData, PrimitiveType, Shape},
+    structure::{CADData, IndexData, Material, PhongMaterialData, PrimitiveType, Shape},
     Color, Error, RGB,
 };
+
+use super::accessor_iterator::AccessorIterator;
 
 /// A loader for GLTF 2.0
 /// Specification: See `<https://www.khronos.org/gltf/>`
@@ -141,6 +149,302 @@ impl Loader for LoaderGLTF {
     }
 }
 
+struct GLTFData {
+    pub document: Document,
+    pub blobs: Vec<Vec<u8>>,
+}
+
+struct CADDataCreator {
+    shape_map: HashMap<usize, Rc<Shape>>,
+    material_map: HashMap<usize, Rc<Material>>,
+}
+
+impl CADDataCreator {
+    pub fn new() -> Self {
+        Self {
+            shape_map: HashMap::new(),
+            material_map: HashMap::new(),
+        }
+    }
+
+    pub fn create(self, gltf_data: &GLTFData) -> Result<CADData, Error> {
+        let mut creator = self;
+
+        creator.create_materials(gltf_data)?;
+        creator.create_shapes(gltf_data)?;
+
+        todo!()
+    }
+
+    /// Creates the materials from the GLTF materials.
+    fn create_materials(&mut self, gltf_data: &GLTFData) -> Result<(), Error> {
+        for (material_index, material) in gltf_data.document.materials().enumerate() {
+            let material = Rc::new(self.create_material(material)?);
+            self.material_map.insert(material_index, material);
+        }
+
+        Ok(())
+    }
+
+    /// Creates a phong material from the given PBR material.
+    ///
+    /// # Arguments
+    /// * `material` - The GLTF material used for creating the phong material
+    fn create_material(&self, material: GLTFMaterial) -> Result<Material, Error> {
+        let [r, g, b, alpha_value] = material.pbr_metallic_roughness().base_color_factor();
+        let diffuse_color = RGB(Vec3::new(r, g, b));
+
+        let alpha_value = match material.alpha_mode() {
+            AlphaMode::Opaque => 1f32,
+            AlphaMode::Mask => alpha_value,
+            AlphaMode::Blend => match material.alpha_cutoff() {
+                None => alpha_value,
+                Some(alpha_cut_off) => {
+                    if alpha_value <= alpha_cut_off {
+                        0f32
+                    } else {
+                        1f32
+                    }
+                }
+            },
+        };
+
+        let mut phong_data = PhongMaterialData::default();
+        phong_data.diffuse_color = diffuse_color;
+        phong_data.transparency = 1f32 - alpha_value;
+
+        Ok(Material::PhongMaterial(phong_data))
+    }
+
+    /// Returns the default material. If it doesn't exists, it will be created.
+    fn get_default_material(&mut self) -> Rc<Material> {
+        let default_material_index = usize::MAX;
+
+        match self.material_map.get(&default_material_index) {
+            Some(m) => m.clone(),
+            None => {
+                let mut phong_data: PhongMaterialData = Default::default();
+                phong_data.diffuse_color = RGB::black();
+                let default_material = Rc::new(Material::PhongMaterial(phong_data));
+
+                self.material_map
+                    .insert(default_material_index, default_material.clone());
+
+                default_material
+            }
+        }
+    }
+
+    /// Returns a material for the given GLTF material. If the material cannot be found, a warning
+    /// is emitted and the default material is returned instead.
+    ///
+    /// # Arguments
+    /// * `material` - The GLTF material to translate to material.
+    fn get_material(&mut self, material: GLTFMaterial) -> Rc<Material> {
+        // check if the given GLTF material has an index defined
+        let index = match material.index() {
+            Some(index) => index,
+            None => return self.get_default_material(),
+        };
+
+        // use index to lookup the material
+        match self.material_map.get(&index) {
+            Some(m) => {
+                return m.clone();
+            }
+            None => {
+                warn!(
+                    "Cannot find material with index {}. Take default material",
+                    index
+                );
+                return self.get_default_material();
+            }
+        }
+    }
+
+    /// Creates the shapes from the GLTF meshes.
+    fn create_shapes(&mut self, gltf_data: &GLTFData) -> Result<(), Error> {
+        let meshes = gltf_data.document.meshes();
+
+        for mesh in meshes {
+            let mesh_index = mesh.index();
+            let shape = Rc::new(self.create_shape(mesh, gltf_data)?);
+
+            self.shape_map.insert(mesh_index, shape);
+        }
+
+        Ok(())
+    }
+
+    fn create_shape(&mut self, mesh: GLTFMesh, gltf_data: &GLTFData) -> Result<Shape, Error> {
+        let primitives = mesh.primitives();
+
+        for primitive in primitives {
+            let material = self.get_material(primitive.material());
+            let primitive_type = Self::translate_primitive_mode(primitive.mode());
+            let index_data = Self::create_index_data(gltf_data, primitive)?;
+
+            todo!()
+        }
+
+        todo!()
+    }
+
+    /// Creates the index data for the given GLTF mesh.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
+    /// * `primitive` - The mesh for which the index data will be created.
+    fn create_index_data(
+        gltf_data: &GLTFData,
+        primitive: GLTFPrimitive,
+    ) -> Result<IndexData, Error> {
+        match primitive.indices() {
+            Some(accessor) => {
+                if accessor.dimensions() != Dimensions::Scalar {
+                    return Err(Error::InvalidFormat(format!(
+                        "Dimension for indices must be scalar, but is {:?}",
+                        accessor.dimensions()
+                    )));
+                }
+
+                let data_type = accessor.data_type();
+                if !Self::is_data_type_integer(data_type) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Data Type for indices must be an integer, but is {:?}",
+                        data_type
+                    )));
+                }
+
+                match accessor.view() {
+                    None => {
+                        return Err(Error::InvalidFormat(format!(
+                            "Indices are missing corresponding buffer view"
+                        )));
+                    }
+                    Some(view) => {
+                        let indices = match accessor.data_type() {
+                            GLTFDataType::U8 => {
+                                Self::extract_indices::<u8>(gltf_data, accessor, view)
+                            }
+                            GLTFDataType::U16 => {
+                                Self::extract_indices::<u16>(gltf_data, accessor, view)
+                            }
+                            GLTFDataType::U32 => {
+                                Self::extract_indices::<u32>(gltf_data, accessor, view)
+                            }
+                            GLTFDataType::I8 => {
+                                Self::extract_indices::<i8>(gltf_data, accessor, view)
+                            }
+                            GLTFDataType::I16 => {
+                                Self::extract_indices::<i16>(gltf_data, accessor, view)
+                            }
+                            _ => {
+                                return Err(Error::InvalidFormat(format!(
+                                    "Invalid data type for indices {:?}",
+                                    accessor.data_type()
+                                )));
+                            }
+                        }?;
+
+                        let index_data = IndexData::Indices(indices);
+
+                        Ok(index_data)
+                    }
+                }
+            }
+            None => {
+                let num_vertices = Self::determine_num_vertices(primitive.attributes())?;
+                let index_data = IndexData::NonIndexed(num_vertices);
+
+                Ok(index_data)
+            }
+        }
+    }
+
+    /// Extracts the indices from the given accessor and related buffer view.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
+    /// * `accessor` - The accessor used for extracting the model data.
+    /// * `view` - The buffer that defines the view onto the data.
+    fn extract_indices<T>(
+        gltf_data: &GLTFData,
+        accessor: Accessor,
+        view: View,
+    ) -> Result<Vec<u32>, Error>
+    where
+        T: Sized + Copy + TryInto<u32> + Display,
+    {
+        let buffer_index = view.buffer().index();
+        if buffer_index >= gltf_data.blobs.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Invalid buffer index {}",
+                buffer_index
+            )));
+        }
+
+        let buffer = gltf_data.blobs[buffer_index].as_ref();
+
+        let it = AccessorIterator::<T>::new(buffer, view, accessor.clone());
+        let mut indices = Vec::with_capacity(accessor.count());
+        for index in it {
+            let index: u32 = match index.try_into() {
+                Ok(index) => index,
+                Err(_) => {
+                    return Err(Error::InvalidFormat(format!("Invalid index {}", index)));
+                }
+            };
+
+            indices.push(index);
+        }
+
+        Ok(indices)
+    }
+
+    /// Translates the given GLTF mode into a primitive type.
+    fn translate_primitive_mode(mode: Mode) -> PrimitiveType {
+        match mode {
+            Mode::Points => PrimitiveType::Point,
+            Mode::Lines => PrimitiveType::Line,
+            Mode::LineLoop => PrimitiveType::LineLoop,
+            Mode::LineStrip => PrimitiveType::LineStrip,
+            Mode::Triangles => PrimitiveType::Triangles,
+            Mode::TriangleFan => PrimitiveType::TriangleFan,
+            Mode::TriangleStrip => PrimitiveType::TriangleStrip,
+        }
+    }
+
+    /// Returns if the given data type is an integer.
+    ///
+    /// # Arguments
+    /// * `data_type` - The datatype to check.
+    fn is_data_type_integer(data_type: GLTFDataType) -> bool {
+        match data_type {
+            GLTFDataType::I8 => true,
+            GLTFDataType::U8 => true,
+            GLTFDataType::I16 => true,
+            GLTFDataType::U16 => true,
+            GLTFDataType::U32 => true,
+            _ => false,
+        }
+    }
+
+    /// Tries to determine the number of vertices for the given attributes.
+    ///
+    /// # Arguments
+    /// * `attributes` - The attributes whose total number will be determined.
+    fn determine_num_vertices(attributes: Attributes) -> Result<usize, Error> {
+        let mut attributes = attributes;
+        match attributes.find(|(s, _)| *s == Semantic::Positions) {
+            Some((_, a)) => Ok(a.count()),
+            None => Err(Error::InvalidFormat(format!(
+                "Primitive attributes have no position"
+            ))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{fmt::Debug, io::Cursor, path::PathBuf, str::FromStr};
@@ -218,160 +522,5 @@ mod tests {
 
         let loader = LoaderGLTF::new();
         let cad_data = loader.read(&r).unwrap();
-    }
-}
-
-struct GLTFData {
-    pub document: Document,
-    pub blobs: Vec<Vec<u8>>,
-}
-
-struct CADDataCreator {
-    shape_map: HashMap<usize, Rc<Shape>>,
-    material_map: HashMap<usize, Rc<Material>>,
-}
-
-impl CADDataCreator {
-    pub fn new() -> Self {
-        Self {
-            shape_map: HashMap::new(),
-            material_map: HashMap::new(),
-        }
-    }
-
-    pub fn create(self, gltf_data: &GLTFData) -> Result<CADData, Error> {
-        let mut creator = self;
-
-        creator.create_materials(gltf_data)?;
-        creator.create_shapes(gltf_data)?;
-
-        todo!()
-    }
-
-    /// Creates the materials from the GLTF materials.
-    fn create_materials(&mut self, gltf_data: &GLTFData) -> Result<(), Error> {
-        for (material_index, material) in gltf_data.document.materials().enumerate() {
-            let material = Rc::new(self.create_material(material)?);
-            self.material_map.insert(material_index, material);
-        }
-
-        Ok(())
-    }
-
-    /// Creates a phong material from the given PBR material.
-    ///
-    /// # Arguments
-    /// * `material` - The GLTF material used for creating the phong material
-    fn create_material(&self, material: GLTFMaterial) -> Result<Material, Error> {
-        let base_color = material.pbr_metallic_roughness().base_color_factor();
-        let diffuse_color = RGB(Vec3::from_row_slice(&base_color));
-
-        let alpha_value = base_color[3];
-        let alpha_value = match material.alpha_mode() {
-            AlphaMode::Opaque => 1f32,
-            AlphaMode::Mask => alpha_value,
-            AlphaMode::Blend => match material.alpha_cutoff() {
-                None => alpha_value,
-                Some(alpha_cut_off) => {
-                    if alpha_value <= alpha_cut_off {
-                        0f32
-                    } else {
-                        1f32
-                    }
-                }
-            },
-        };
-
-        let mut phong_data = PhongMaterialData::default();
-        phong_data.diffuse_color = diffuse_color;
-        phong_data.transparency = 1f32 - alpha_value;
-
-        Ok(Material::PhongMaterial(phong_data))
-    }
-
-    /// Returns the default material. If it doesn't exists, it will be created.
-    fn get_default_material(&mut self) -> Rc<Material> {
-        let default_material_index = usize::MAX;
-
-        match self.material_map.get(&default_material_index) {
-            Some(m) => m.clone(),
-            None => {
-                let mut phong_data: PhongMaterialData = Default::default();
-                phong_data.diffuse_color = RGB::black();
-                let default_material = Rc::new(Material::PhongMaterial(phong_data));
-
-                self.material_map
-                    .insert(default_material_index, default_material.clone());
-
-                default_material
-            }
-        }
-    }
-
-    /// Returns a material for the given GLTF material. If the material cannot be found, a warning
-    /// is emitted and the default material is returned instead.
-    ///
-    /// # Arguments
-    /// * `material` - The GLTF material to translate to material.
-    fn get_material(&mut self, material: GLTFMaterial) -> Rc<Material> {
-        // check if the given GLTF material has an index defined
-        let index = match material.index() {
-            Some(index) => index,
-            None => return self.get_default_material(),
-        };
-
-        // use index to lookup the material
-        match self.material_map.get(&index) {
-            Some(m) => {
-                return m.clone();
-            }
-            None => {
-                warn!(
-                    "Cannot find material with index {}. Take default material",
-                    index
-                );
-                return self.get_default_material();
-            }
-        }
-    }
-
-    /// Creates the shapes from the GLTF meshes.
-    fn create_shapes(&mut self, gltf_data: &GLTFData) -> Result<(), Error> {
-        let meshes = gltf_data.document.meshes();
-
-        for mesh in meshes {
-            let mesh_index = mesh.index();
-            let shape = Rc::new(self.create_shape(mesh, gltf_data)?);
-
-            //     self.shape_map.insert(mesh_index, shape);
-        }
-
-        Ok(())
-    }
-
-    fn create_shape(&mut self, mesh: GLTFMesh, gltf_data: &GLTFData) -> Result<Shape, Error> {
-        let primitives = mesh.primitives();
-
-        for primitive in primitives {
-            let material = self.get_material(primitive.material());
-            let primitive_type = Self::translate_primitive_mode(primitive.mode());
-
-            todo!()
-        }
-
-        todo!()
-    }
-
-    /// Translates the given GLTF mode into a primitive type.
-    fn translate_primitive_mode(mode: Mode) -> PrimitiveType {
-        match mode {
-            Mode::Points => PrimitiveType::Point,
-            Mode::Lines => PrimitiveType::Line,
-            Mode::LineLoop => PrimitiveType::LineLoop,
-            Mode::LineStrip => PrimitiveType::LineStrip,
-            Mode::Triangles => PrimitiveType::Triangles,
-            Mode::TriangleFan => PrimitiveType::TriangleFan,
-            Mode::TriangleStrip => PrimitiveType::TriangleStrip,
-        }
     }
 }
