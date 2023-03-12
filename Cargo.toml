@@ -22,3 +22,4 @@ log = "0.4"
 
 [dev-dependencies]
 path-clean = "1.0"
+byteorder = "1.4"
