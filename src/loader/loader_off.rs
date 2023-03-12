@@ -11,7 +11,7 @@ use crate::{
     error::Error,
     structure::{
         CADData, Colors, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives, Shape,
-        ShapePart, Vertices,
+        ShapePart, Vertices, IndexData,
     },
 };
 
@@ -214,7 +214,7 @@ impl LoaderOff {
         }
 
         // create the primitives
-        let primitives = Primitives::new(indices, PrimitiveType::Triangles)?;
+        let primitives = Primitives::new(IndexData::Indices(indices), PrimitiveType::Triangles)?;
 
         Ok(primitives)
     }
@@ -403,7 +403,7 @@ mod tests {
         assert_eq!(min, Vec3::new(-0.5f32, -0.5f32, -0.5f32));
         assert_eq!(max, Vec3::new(0.5f32, 0.5f32, 0.5f32));
 
-        let area = compute_area(vertices.get_positions(), primitives.get_raw_index_data());
+        let area = compute_area(vertices.get_positions(), primitives.get_raw_index_data().get_indices_ref().unwrap());
         assert!((area - 6f32).abs() <= 1e-6f32);
     }
 }
