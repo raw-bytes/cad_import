@@ -18,11 +18,14 @@ use nalgebra_glm::Vec3;
 
 use crate::{
     loader::{Loader, Resource},
-    structure::{CADData, IndexData, Material, PhongMaterialData, PrimitiveType, Shape},
+    structure::{
+        CADData, IndexData, Material, Mesh, Normals, PhongMaterialData, Point3D, Positions,
+        PrimitiveType, Primitives, Shape, ShapePart, Vertices,
+    },
     Color, Error, RGB,
 };
 
-use super::accessor_iterator::AccessorIterator;
+use super::{accessor_iterator::AccessorIterator, component::ComponentTrait, utils::transmute_vec};
 
 /// A loader for GLTF 2.0
 /// Specification: See `<https://www.khronos.org/gltf/>`
@@ -239,6 +242,7 @@ impl CADDataCreator {
     /// is emitted and the default material is returned instead.
     ///
     /// # Arguments
+    ///
     /// * `material` - The GLTF material to translate to material.
     fn get_material(&mut self, material: GLTFMaterial) -> Rc<Material> {
         // check if the given GLTF material has an index defined
@@ -262,7 +266,10 @@ impl CADDataCreator {
         }
     }
 
-    /// Creates the shapes from the GLTF meshes.
+    /// Creates an internal map from GLTF mesh index to shape.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
     fn create_shapes(&mut self, gltf_data: &GLTFData) -> Result<(), Error> {
         let meshes = gltf_data.document.meshes();
 
@@ -276,18 +283,74 @@ impl CADDataCreator {
         Ok(())
     }
 
+    /// Creates a shape from of the given GLTF mesh.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
+    /// * `mesh` - The GLTF mesh that is parsed to create the shape.
     fn create_shape(&mut self, mesh: GLTFMesh, gltf_data: &GLTFData) -> Result<Shape, Error> {
-        let primitives = mesh.primitives();
+        let mut shape = Shape::new();
 
+        let primitives = mesh.primitives();
         for primitive in primitives {
             let material = self.get_material(primitive.material());
-            let primitive_type = Self::translate_primitive_mode(primitive.mode());
-            let index_data = Self::create_index_data(gltf_data, primitive)?;
 
-            todo!()
+            // create the mesh primitive data
+            let primitive_type = Self::translate_primitive_mode(primitive.mode());
+            let index_data = Self::create_index_data(gltf_data, primitive.clone())?;
+            let mesh_primitives = Primitives::new(index_data, primitive_type)?;
+
+            // create positions
+            let positions: Positions = match Self::find_accessor_by_semantic(
+                primitive.attributes(),
+                Semantic::Positions,
+            ) {
+                Some(accessor) => transmute_vec(Self::create_vec3_data(gltf_data, accessor)?),
+                None => {
+                    return Err(Error::InvalidFormat(format!(
+                        "Missing position attribute for the primitive data"
+                    )));
+                }
+            };
+
+            let num_vertices = positions.len();
+            let mut vertices = Vertices::from_positions(positions);
+
+            match Self::find_accessor_by_semantic(primitive.attributes(), Semantic::Normals) {
+                Some(accessor) => {
+                    let normals: Normals =
+                        transmute_vec(Self::create_vec3_data(gltf_data, accessor)?);
+                    if normals.len() != num_vertices {
+                        return Err(Error::InvalidFormat(format!(
+                            "Number of positions {} do not match number of normals {}",
+                            num_vertices,
+                            normals.len()
+                        )));
+                    }
+
+                    vertices.set_normals(normals)?;
+                }
+                None => {}
+            }
+
+            let mesh = Mesh::new(vertices, mesh_primitives)?;
+            shape.add_part(ShapePart::new(Rc::new(mesh), material));
         }
 
-        todo!()
+        Ok(shape)
+    }
+
+    /// Tries to find an accessor with the specified semantic.
+    ///
+    /// # Arguments
+    /// * `attributes` - The attributes to search within.
+    /// * `semantic` - The semantic to search for.
+    fn find_accessor_by_semantic(attributes: Attributes, semantic: Semantic) -> Option<Accessor> {
+        let mut attributes = attributes;
+        match attributes.find(|(s, a)| *s == semantic) {
+            Some((_, a)) => Some(a),
+            None => None,
+        }
     }
 
     /// Creates the index data for the given GLTF mesh.
@@ -400,6 +463,92 @@ impl CADDataCreator {
         }
 
         Ok(indices)
+    }
+
+    /// Creates vector 3 data from the given accessor.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
+    /// * `accessor` - The accessor that is used for the data.
+    fn create_vec3_data(gltf_data: &GLTFData, accessor: Accessor) -> Result<Vec<Vec3>, Error> {
+        if accessor.dimensions().multiplicity() != 3 {
+            return Err(Error::InvalidFormat(format!(
+                "Dimension is not 3, but {}",
+                accessor.dimensions().multiplicity()
+            )));
+        }
+
+        let data_type = accessor.data_type();
+
+        let view = match accessor.view() {
+            Some(view) => view,
+            None => {
+                return Err(Error::InvalidFormat(format!(
+                    "Missing buffer view reference"
+                )));
+            }
+        };
+
+        let vecs = match accessor.data_type() {
+            GLTFDataType::U8 => Self::extract_vecs3::<u8>(gltf_data, accessor, view),
+            GLTFDataType::U16 => Self::extract_vecs3::<u16>(gltf_data, accessor, view),
+            GLTFDataType::U32 => Self::extract_vecs3::<u32>(gltf_data, accessor, view),
+            GLTFDataType::I8 => Self::extract_vecs3::<i8>(gltf_data, accessor, view),
+            GLTFDataType::I16 => Self::extract_vecs3::<i16>(gltf_data, accessor, view),
+            GLTFDataType::F32 => Self::extract_vecs3::<f32>(gltf_data, accessor, view),
+        }?;
+
+        Ok(vecs)
+    }
+
+    /// Extracts the vector 3 from the given accessor and related buffer view.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The overall loaded GLTF data.
+    /// * `accessor` - The accessor used for extracting the data.
+    /// * `view` - The buffer that defines the view onto the data.
+    fn extract_vecs3<T: ComponentTrait>(
+        gltf_data: &GLTFData,
+        accessor: Accessor,
+        view: View,
+    ) -> Result<Vec<Vec3>, Error>
+    where
+        T: Sized + Copy + Display,
+    {
+        let normalize = accessor.normalized();
+
+        let buffer_index = view.buffer().index();
+        if buffer_index >= gltf_data.blobs.len() {
+            return Err(Error::InvalidFormat(format!(
+                "Invalid buffer index {}",
+                buffer_index
+            )));
+        }
+
+        let buffer = gltf_data.blobs[buffer_index].as_ref();
+
+        let mut vecs: Vec<Vec3> = Vec::with_capacity(accessor.count());
+        let it = AccessorIterator::<[T; 3]>::new(buffer, view, accessor.clone());
+
+        for x in it {
+            let v = Vec3::new(
+                x[0].to_f32(normalize),
+                x[1].to_f32(normalize),
+                x[2].to_f32(normalize),
+            );
+
+            vecs.push(v);
+        }
+
+        if vecs.len() != accessor.count() {
+            return Err(Error::InvalidFormat(format!(
+                "Read {} values, but should have been {}",
+                vecs.len(),
+                accessor.count() * 3
+            )));
+        }
+
+        Ok(vecs)
     }
 
     /// Translates the given GLTF mode into a primitive type.
