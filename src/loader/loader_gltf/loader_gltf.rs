@@ -19,8 +19,8 @@ use nalgebra_glm::Vec3;
 use crate::{
     loader::{Loader, Resource},
     structure::{
-        CADData, IndexData, Material, Mesh, Normals, PhongMaterialData, Point3D, Positions,
-        PrimitiveType, Primitives, Shape, ShapePart, Vertices,
+        CADData, IndexData, Material, Mesh, Normals, PhongMaterialData, Positions, PrimitiveType,
+        Primitives, Shape, ShapePart, Vertices,
     },
     Color, Error, RGB,
 };
@@ -347,7 +347,7 @@ impl CADDataCreator {
     /// * `semantic` - The semantic to search for.
     fn find_accessor_by_semantic(attributes: Attributes, semantic: Semantic) -> Option<Accessor> {
         let mut attributes = attributes;
-        match attributes.find(|(s, a)| *s == semantic) {
+        match attributes.find(|(s, _a)| *s == semantic) {
             Some((_, a)) => Some(a),
             None => None,
         }
@@ -478,8 +478,6 @@ impl CADDataCreator {
             )));
         }
 
-        let data_type = accessor.data_type();
-
         let view = match accessor.view() {
             Some(view) => view,
             None => {
@@ -596,52 +594,11 @@ impl CADDataCreator {
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, io::Cursor, path::PathBuf, str::FromStr};
+    use std::{path::PathBuf, str::FromStr};
 
     use crate::loader::FileResource;
 
     use super::*;
-
-    pub struct FakeResource {
-        data: &'static [u8],
-        mime_type: String,
-    }
-
-    impl FakeResource {
-        pub fn new(data: &'static [u8], mime_type: String) -> Self {
-            Self { data, mime_type }
-        }
-    }
-
-    impl ToString for FakeResource {
-        fn to_string(&self) -> String {
-            "".to_owned()
-        }
-    }
-
-    impl Debug for FakeResource {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "")
-        }
-    }
-
-    impl Resource for FakeResource {
-        fn open(&self) -> Result<Box<dyn std::io::Read>, Error> {
-            Ok(Box::new(Cursor::new(self.data)))
-        }
-
-        fn sub(&self, _s: &str, mime_type: &str) -> Result<Box<dyn Resource>, Error> {
-            let s = Self {
-                data: self.data,
-                mime_type: mime_type.to_owned(),
-            };
-            Ok(Box::new(s))
-        }
-
-        fn get_mime_type(&self) -> String {
-            self.mime_type.clone()
-        }
-    }
 
     #[test]
     fn test_gltf() {
