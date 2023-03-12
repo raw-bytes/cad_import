@@ -41,8 +41,26 @@ impl Vertices {
         self.positions.len()
     }
 
-    /// Sets the color attribute of the vertices. If the number of colors do not match the number
-    /// of vertices, an error is retuned.
+    /// Sets the normal attribute. If the number of normals does not match the number
+    /// of vertices, an error is returned.
+    ///
+    /// # Arguments
+    /// * `colors` - The color attribute to set.
+    pub fn set_normals(&mut self, normals: Normals) -> Result<(), Error> {
+        if self.positions.len() != normals.len() {
+            Err(Error::InvalidArgument(format!(
+                "Got {} vertices, but normal attribute only has {} entries",
+                self.positions.len(),
+                normals.len()
+            )))
+        } else {
+            self.normals = Some(normals);
+            Ok(())
+        }
+    }
+
+    /// Sets the color attribute. If the number of colors does not match the number
+    /// of vertices, an error is returned.
     ///
     /// # Arguments
     /// * `colors` - The color attribute to set.

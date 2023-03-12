@@ -55,6 +55,11 @@ impl<'a, Element: Copy> AccessorIterator<'a, Element> {
             buffer_stride
         };
 
+        assert_eq!(
+            std::mem::size_of::<Element>(),
+            get_size_in_bytes(data_type) * dimension.multiplicity()
+        );
+
         // determine offset
         let offset = buffer_offset + accessor_offset;
 
@@ -63,7 +68,7 @@ impl<'a, Element: Copy> AccessorIterator<'a, Element> {
             buffer,
             offset,
             stride,
-            count,
+            count: count,
             index: 0,
         }
     }
