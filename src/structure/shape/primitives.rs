@@ -12,51 +12,82 @@ pub enum PrimitiveType {
     TriangleFan = 6,
 }
 
+/// The index data defines how the primitives are indexed.
+#[derive(Clone)]
+pub enum IndexData {
+    /// Non-indexed primitives are defined by the natural order of their vertices.
+    /// This is for example the usual pattern for point data.
+    NonIndexed(usize),
+
+    /// The raw 32-bit indices.
+    Indices(Vec<u32>),
+}
+
+impl IndexData {
+    /// Returns the number of indices.
+    pub fn num_indices(&self) -> usize {
+        match self {
+            IndexData::NonIndexed(n) => *n,
+            IndexData::Indices(indices) => indices.len(),
+        }
+    }
+
+    /// Returns a reference onto the indices.
+    pub fn get_indices_ref(&self) -> Option<&[u32]> {
+        match self {
+            IndexData::Indices(indices) => Some(indices),
+            _ => None,
+        }
+    }
+}
+
 /// The primitives defined by its indices.
 pub struct Primitives {
     /// The primitive type of the index data
     primitive_type: PrimitiveType,
 
     /// The raw stored index data
-    indices: Vec<u32>,
+    index_data: IndexData,
 }
 
 impl Primitives {
     /// Returns a new empty primitive data.
     /// 
     /// # Arguments
-    /// * `indices` - The indices to use.
+    /// * `index_data` - The index data that define how vertices are combined to primitives.
     /// * `primitive_type` - The primitive type.
-    pub fn new(indices: Vec<u32>, primitive_type: PrimitiveType) -> Result<Self, Error> {
+    pub fn new(index_data: IndexData, primitive_type: PrimitiveType) -> Result<Self, Error> {
+        let num_indices = index_data.num_indices();
+
         // check constraints
         match primitive_type {
             PrimitiveType::Line => {
-                if indices.len() % 2 != 0 {
+                if num_indices % 2 != 0 {
                     return Err(Error::Indices(format!("Lines primitive indices must be a multiple of 2")));
                 }
             },
             PrimitiveType::LineStrip => {
-                if indices.len() < 2 {
+                if num_indices < 2 {
                     return Err(Error::Indices(format!("Line-strips indices must be at least 2")));
                 }
             },
             PrimitiveType::LineLoop => {
-                if indices.len() < 2 {
+                if num_indices < 2 {
                     return Err(Error::Indices(format!("Line-loop indices must be at least 2")));
                 }
             },
             PrimitiveType::Triangles => {
-                if indices.len() % 3 != 0 {
+                if num_indices % 3 != 0 {
                     return Err(Error::Indices(format!("Triangle indices must be a multiple of 3")));
                 }
             },
             PrimitiveType::TriangleStrip => {
-                if indices.len() < 3 {
+                if num_indices < 3 {
                     return Err(Error::Indices(format!("Triangle-strip indices must be at least 3")));
                 }
             },
             PrimitiveType::TriangleFan => {
-                if indices.len() < 3 {
+                if num_indices < 3 {
                     return Err(Error::Indices(format!("Triangle-fan indices must be at least 3")));
                 }
             },
@@ -65,20 +96,21 @@ impl Primitives {
         
         Ok(Self {
             primitive_type,
-            indices,
+            index_data,
         })
     }
 
     /// Returns the number of primitives.
     pub fn num_primitives(&self) -> usize {
+        let num_indices = self.index_data.num_indices();
         match self.primitive_type {
-            PrimitiveType::Point => self.indices.len(),
-            PrimitiveType::Line => self.indices.len() / 2,
-            PrimitiveType::LineStrip => self.indices.len() - 1,
-            PrimitiveType::LineLoop => self.indices.len(),
-            PrimitiveType::Triangles => self.indices.len() / 3,
-            PrimitiveType::TriangleStrip => self.indices.len() - 2,
-            PrimitiveType::TriangleFan => self.indices.len() - 2,
+            PrimitiveType::Point =>num_indices,
+            PrimitiveType::Line =>num_indices / 2,
+            PrimitiveType::LineStrip => if num_indices == 0 { 0 } else { num_indices - 1 },
+            PrimitiveType::LineLoop =>num_indices,
+            PrimitiveType::Triangles =>num_indices / 3,
+            PrimitiveType::TriangleStrip => if num_indices >= 2 { num_indices - 2 } else { 0 },
+            PrimitiveType::TriangleFan => if num_indices >= 2 { num_indices - 2 } else { 0 },
         }
     }
 
@@ -88,15 +120,20 @@ impl Primitives {
     }
 
     /// Returns a slice on the raw indices.
-    pub fn get_raw_index_data(&self) -> &[u32] {
-        &self.indices
+    pub fn get_raw_index_data(&self) -> &IndexData {
+        &self.index_data
     }
 
     /// Returns the maximal referenced vertex.
     pub fn max_index(&self) -> Option<u32> {
-        match self.indices.iter().max() {
-            Some(m) => Some(*m),
-            None => None,
+        match &self.index_data {
+            IndexData::Indices(indices) => {
+                match indices.iter().max() {
+                    Some(m) => Some(*m),
+                    None => None,
+                }
+            }
+            IndexData::NonIndexed(n) => if *n == 0 { None } else { Some((*n  - 1) as u32) }
         }
     }
 }
@@ -107,25 +144,25 @@ mod tests {
 
     #[test]
     fn test_num_primitives() {
-        let p = Primitives::new(vec![1,2], PrimitiveType::Point).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2]), PrimitiveType::Point).unwrap();
         assert_eq!(p.num_primitives(), 2);
 
-        let p = Primitives::new(vec![1,2,3,4], PrimitiveType::Line).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4]), PrimitiveType::Line).unwrap();
         assert_eq!(p.num_primitives(), 2);
 
-        let p = Primitives::new(vec![1,2,3,4], PrimitiveType::LineLoop).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4]), PrimitiveType::LineLoop).unwrap();
         assert_eq!(p.num_primitives(), 4);
 
-        let p = Primitives::new(vec![1,2,3,4], PrimitiveType::LineStrip).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4]), PrimitiveType::LineStrip).unwrap();
         assert_eq!(p.num_primitives(), 3);
 
-        let p = Primitives::new(vec![1,2,3,4,5,6], PrimitiveType::Triangles).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4,5,6]), PrimitiveType::Triangles).unwrap();
         assert_eq!(p.num_primitives(), 2);
 
-        let p = Primitives::new(vec![1,2,3,4,5,6], PrimitiveType::TriangleStrip).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4,5,6]), PrimitiveType::TriangleStrip).unwrap();
         assert_eq!(p.num_primitives(), 4);
 
-        let p = Primitives::new(vec![1,2,3,4,5,6], PrimitiveType::TriangleFan).unwrap();
+        let p = Primitives::new(IndexData::Indices(vec![1,2,3,4,5,6]), PrimitiveType::TriangleFan).unwrap();
         assert_eq!(p.num_primitives(), 4);
     }
 }
