@@ -10,17 +10,18 @@ use gltf::{
     iter::Buffers,
     material::AlphaMode,
     mesh::{iter::Attributes, Mode},
-    Accessor, Document, Gltf, Material as GLTFMaterial, Mesh as GLTFMesh,
+    scene::Transform,
+    Accessor, Document, Gltf, Material as GLTFMaterial, Mesh as GLTFMesh, Node as GLTFNode,
     Primitive as GLTFPrimitive, Semantic,
 };
 use log::{debug, warn};
-use nalgebra_glm::Vec3;
+use nalgebra_glm::{Mat4, Vec3};
 
 use crate::{
     loader::{Loader, Resource},
     structure::{
-        CADData, IndexData, Material, Mesh, Normals, PhongMaterialData, Positions, PrimitiveType,
-        Primitives, Shape, ShapePart, Vertices,
+        CADData, IndexData, Material, Mesh, Node, Normals, PhongMaterialData, Positions,
+        PrimitiveType, Primitives, Shape, ShapePart, Vertices,
     },
     Color, Error, RGB,
 };
@@ -163,6 +164,7 @@ struct CADDataCreator {
 }
 
 impl CADDataCreator {
+    /// Returns a new empty CAD data creator object.
     pub fn new() -> Self {
         Self {
             shape_map: HashMap::new(),
@@ -170,13 +172,116 @@ impl CADDataCreator {
         }
     }
 
+    /// Creates the CAD-Data from the given GLTF data.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The GLTF data used for creating the overall CAD data.
     pub fn create(self, gltf_data: &GLTFData) -> Result<CADData, Error> {
         let mut creator = self;
 
         creator.create_materials(gltf_data)?;
         creator.create_shapes(gltf_data)?;
+        let root_node = creator.create_nodes(gltf_data)?;
 
-        todo!()
+        Ok(CADData::new(root_node))
+    }
+
+    /// Creates a tree from all GLTF scenes and data.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The GLTF data which is used for parsing and creating the tree.
+    fn create_nodes(&self, gltf_data: &GLTFData) -> Result<Node, Error> {
+        // iterate over the list of GLTF scenes and create a node for each scene
+        let scenes = gltf_data.document.scenes();
+        let mut root_nodes: Vec<Node> = Vec::with_capacity(scenes.len());
+        for scene in scenes {
+            let label = match scene.name() {
+                Some(s) => s.to_owned(),
+                None => "".to_owned(),
+            };
+
+            let mut scene_root_node = Node::new(label);
+
+            for node in scene.nodes() {
+                scene_root_node.add_child(self.process_node(gltf_data, node)?);
+            }
+
+            root_nodes.push(scene_root_node);
+        }
+
+        // check if we have 1 or more scenes or none at all which is an error
+        match root_nodes.len() {
+            0 => Err(Error::InvalidFormat(format!("No scenes at all"))),
+            1 => Ok(root_nodes.pop().unwrap()),
+            _ => {
+                let mut root_node = Node::new("root".to_owned());
+                for n in root_nodes {
+                    root_node.add_child(n);
+                }
+
+                Ok(root_node)
+            }
+        }
+    }
+
+    /// Create a tree from the given node.
+    ///
+    /// # Arguments
+    /// * `gltf_data` - The GLTF data which is used for parsing and creating the tree.
+    /// * `in_node` - The gltf node which defines the subtree.
+    fn process_node(&self, gltf_data: &GLTFData, in_node: GLTFNode) -> Result<Node, Error> {
+        let label = match in_node.name() {
+            Some(s) => s.to_owned(),
+            None => "".to_owned(),
+        };
+
+        let mut out_node = Node::new(label);
+
+        // set the matrix for the node
+        let m = Self::transform_to_matrix(in_node.transform());
+        out_node.set_transform(m);
+
+        // attach shapes to the node
+        match in_node.mesh() {
+            Some(mesh) => {
+                let mesh_index = mesh.index();
+                match self.shape_map.get(&mesh_index) {
+                    Some(shape) => {
+                        out_node.attach_shape(shape.clone());
+                    }
+                    None => {
+                        return Err(Error::InvalidFormat(format!(
+                            "Could not find mesh with index {}",
+                            mesh_index
+                        )));
+                    }
+                }
+            }
+            None => {}
+        }
+
+        // iterate over the children
+        for in_child in in_node.children() {
+            let out_child = self.process_node(gltf_data, in_child)?;
+            out_node.add_child(out_child);
+        }
+
+        Ok(out_node)
+    }
+
+    /// Returns a matrix 4 from the given GLTF transformation.
+    ///
+    /// # Arguments
+    /// * `t` - The input transformation.
+    fn transform_to_matrix(t: Transform) -> Mat4 {
+        let values = t.matrix();
+
+        let mut m = Mat4::zeros();
+        for (mut dst_col, src_col) in m.column_iter_mut().zip(values.iter()) {
+            dst_col.copy_from_slice(src_col);
+        }
+
+        m
     }
 
     /// Creates the materials from the GLTF materials.
