@@ -1,21 +1,25 @@
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
     io::{BufRead, BufReader, Error as IOError},
     iter::Peekable,
     rc::Rc,
-    str::{FromStr, SplitAsciiWhitespace}, collections::{BTreeMap, BTreeSet},
+    str::{FromStr, SplitAsciiWhitespace},
 };
 
 use crate::{
     basic_types::RGBA,
     error::Error,
     structure::{
-        CADData, Colors, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives, Shape,
-        ShapePart, Vertices, IndexData,
+        CADData, Colors, IndexData, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives,
+        Shape, ShapePart, Vertices,
     },
 };
 
-use super::{loader::{Loader, ExtensionMap}, Resource};
+use super::{
+    loader::{ExtensionMap, Loader},
+    Resource,
+};
 
 use log::{debug, trace};
 
@@ -244,7 +248,10 @@ impl Loader for LoaderOff {
     fn get_extensions_mime_type_map(&self) -> ExtensionMap {
         let mut ext_map = BTreeMap::new();
 
-        ext_map.insert("off".to_owned(), BTreeSet::from(["model/vnd.off".to_owned()]));
+        ext_map.insert(
+            "off".to_owned(),
+            BTreeSet::from(["model/vnd.off".to_owned()]),
+        );
 
         ext_map
     }
@@ -285,44 +292,9 @@ mod tests {
 
     use nalgebra_glm::{cross, Vec3, U3};
 
+    use crate::loader::MemoryResource;
+
     use super::*;
-
-    pub struct FakeResource {
-        data: &'static [u8],
-    }
-
-    impl FakeResource {
-        pub fn new(data: &'static [u8]) -> Self {
-            Self { data }
-        }
-    }
-
-    impl ToString for FakeResource {
-        fn to_string(&self) -> String {
-            "".to_owned()
-        }
-    }
-
-    impl Debug for FakeResource {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "")
-        }
-    }
-
-    impl Resource for FakeResource {
-        fn open(&self) -> Result<Box<dyn std::io::Read>, Error> {
-            Ok(Box::new(Cursor::new(self.data)))
-        }
-
-        fn sub(&self, _s: &str, _m: &str) -> Result<Box<dyn Resource>, Error> {
-            let s = Self { data: self.data };
-            Ok(Box::new(s))
-        }
-
-        fn get_mime_type(&self) -> String {
-            "".to_owned()
-        }
-    }
 
     /// Computes the bounding volume for the given positions.
     fn compute_bbox(positions: &[Point3D]) -> (Vec3, Vec3) {
@@ -369,7 +341,7 @@ mod tests {
     fn test_cube() {
         let s = include_str!("test_data/cube.off");
 
-        let r = FakeResource::new(s.as_bytes());
+        let r = MemoryResource::new(s.as_bytes(), "model/vnd.off".to_owned());
 
         let loader = LoaderOff::new();
 
@@ -403,7 +375,10 @@ mod tests {
         assert_eq!(min, Vec3::new(-0.5f32, -0.5f32, -0.5f32));
         assert_eq!(max, Vec3::new(0.5f32, 0.5f32, 0.5f32));
 
-        let area = compute_area(vertices.get_positions(), primitives.get_raw_index_data().get_indices_ref().unwrap());
+        let area = compute_area(
+            vertices.get_positions(),
+            primitives.get_raw_index_data().get_indices_ref().unwrap(),
+        );
         assert!((area - 6f32).abs() <= 1e-6f32);
     }
 }
