@@ -54,6 +54,7 @@ mod basic_types;
 mod error;
 pub mod loader;
 pub mod structure;
+pub mod exporter;
 
 pub use basic_types::*;
 pub use error::Error;
