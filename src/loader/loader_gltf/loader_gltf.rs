@@ -701,31 +701,113 @@ impl CADDataCreator {
 mod tests {
     use std::{path::PathBuf, str::FromStr};
 
-    use crate::loader::FileResource;
+    use nalgebra_glm::{cross, U3};
+
+    use crate::{loader::FileResource, structure::Point3D};
 
     use super::*;
+
+    /// Helper function to find any shape by traversing through the nodes.
+    /// Will stop as soon as it encounters the first shape.
+    ///
+    /// # Arguments
+    /// * `node` - The node and its children to check.
+    fn find_shape(node: &Node) -> Option<Rc<Shape>> {
+        if !node.get_shapes().is_empty() {
+            return Some(node.get_shapes()[0].clone());
+        }
+
+        for child in node.get_children() {
+            match find_shape(child) {
+                Some(shape) => return Some(shape),
+                None => {}
+            }
+        }
+
+        None
+    }
+
+    /// Computes the bounding volume for the given positions.
+    fn compute_bbox(positions: &[Point3D]) -> (Vec3, Vec3) {
+        let mut min = Vec3::new(f32::MAX, f32::MAX, f32::MAX);
+        let mut max = Vec3::new(f32::MIN, f32::MIN, f32::MIN);
+
+        for p in positions.iter() {
+            let p = p.0;
+
+            min.x = min.x.min(p.x);
+            min.y = min.y.min(p.y);
+            min.z = min.z.min(p.z);
+
+            max.x = max.x.max(p.x);
+            max.y = max.y.max(p.y);
+            max.z = max.z.max(p.z);
+        }
+
+        (min, max)
+    }
+
+    fn compute_area(positions: &[Point3D], indices: &[u32]) -> f32 {
+        assert_eq!(indices.len() % 3, 0);
+
+        let mut total_area = 0f32;
+        for t in indices.iter().as_slice().windows(3).step_by(3) {
+            let v0 = positions[t[0] as usize].0;
+            let v1 = positions[t[1] as usize].0;
+            let v2 = positions[t[2] as usize].0;
+
+            let a = v1 - v0;
+            let b = v2 - v0;
+
+            let n = cross::<_, U3>(&a, &b);
+
+            let area = nalgebra_glm::l2_norm(&n) * 0.5f32;
+            total_area += area;
+        }
+
+        total_area
+    }
+
+    fn test_if_it_is_a_box(cad_data: &CADData) {
+        let shape = find_shape(cad_data.get_root_node()).unwrap();
+        assert_eq!(shape.get_parts().len(), 1);
+        let part = &shape.get_parts()[0];
+        let mesh = part.get_mesh();
+
+        assert_eq!(mesh.get_vertices().len(), 24);
+
+        let (min_bb, max_bb) = compute_bbox(&mesh.get_vertices().get_positions());
+        assert_eq!(min_bb, Vec3::new(-0.5, -0.5, -0.5));
+        assert_eq!(max_bb, Vec3::new(0.5, 0.5, 0.5));
+
+        let indices = mesh
+            .get_primitives()
+            .get_raw_index_data()
+            .get_indices_ref()
+            .unwrap();
+        let area = compute_area(&mesh.get_vertices().get_positions(), indices);
+        assert_eq!(area, 6.0);
+    }
 
     #[test]
     fn test_gltf() {
         println!(env!("CARGO_MANIFEST_DIR"));
 
-        // let s = include_str!("../test_data/gltf/Box.gltf");
         let r = FileResource::new(
             PathBuf::from_str("src/loader/test_data/gltf/Box.gltf").unwrap(),
             "model/gltf+json",
         );
-        // let r = FakeResource::new(s.as_bytes(), "model/gltf+json".to_owned());
 
         let loader = LoaderGLTF::new();
 
         let cad_data = loader.read(&r).unwrap();
+        test_if_it_is_a_box(&cad_data);
     }
 
     #[test]
     fn test_glb() {
         println!(env!("CARGO_MANIFEST_DIR"));
 
-        // let s = include_str!("../test_data/gltf/Box.gltf");
         let r = FileResource::new(
             PathBuf::from_str("src/loader/test_data/gltf/Box.glb").unwrap(),
             "model/gltf-binary",
@@ -733,5 +815,6 @@ mod tests {
 
         let loader = LoaderGLTF::new();
         let cad_data = loader.read(&r).unwrap();
+        test_if_it_is_a_box(&cad_data);
     }
 }
