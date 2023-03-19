@@ -75,11 +75,12 @@ impl<'a> X3DExporter<'a> {
     fn write_node<W: Write>(&self, writer: &mut Writer<W>, node: &Node) -> Result<(), XMLError> {
         // create the serialized string for the transformation matrix
         let m = node.get_transform().unwrap_or(Mat4::identity());
-        let matrix_string: String = m
-            .column_iter()
-            .map(|c| format!("{} {} {} {}", c[0], c[1], c[2], c[3]))
-            .intersperse(" ".to_owned())
-            .collect();
+        let matrix_string: String = Itertools::intersperse(
+            m.column_iter()
+                .map(|c| format!("{} {} {} {}", c[0], c[1], c[2], c[3])),
+            " ".to_owned(),
+        )
+        .collect();
 
         let group = writer
             .create_element("MatrixTransform")
@@ -201,11 +202,9 @@ impl<'a> X3DExporter<'a> {
                     .write_inner_content(|w| Self::write_vertices(w, vertices))?;
             }
             (PrimitiveType::Triangles, IndexData::Indices(indices)) => {
-                let index_str: String = indices
-                    .iter()
-                    .map(|i| i.to_string())
-                    .intersperse(" ".to_owned())
-                    .collect();
+                let index_str: String =
+                    Itertools::intersperse(indices.iter().map(|i| i.to_string()), " ".to_owned())
+                        .collect();
 
                 writer
                     .create_element("IndexedTriangleSet")
@@ -247,9 +246,11 @@ impl<'a> X3DExporter<'a> {
     where
         I: Iterator<Item = Vec3>,
     {
-        vecs.map(|v| format!("{} {} {}", v[0], v[1], v[2]))
-            .intersperse(" ".to_owned())
-            .collect()
+        Itertools::intersperse(
+            vecs.map(|v| format!("{} {} {}", v[0], v[1], v[2])),
+            " ".to_owned(),
+        )
+        .collect()
     }
 }
 
