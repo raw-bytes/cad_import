@@ -81,7 +81,7 @@ impl<'a> X3DExporter<'a> {
             .intersperse(" ".to_owned())
             .collect();
 
-        let mut group = writer
+        let group = writer
             .create_element("MatrixTransform")
             .with_attribute(Attribute::from(("matrix", matrix_string.as_str())));
 
@@ -112,7 +112,7 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The writer to which the metadata set will be added
     /// * `label` - The node label which is added to the metadata set.
     fn write_label<W: Write>(writer: &mut Writer<W>, label: &str) -> Result<(), XMLError> {
-        let mut metadata_set = writer.create_element("MetadataSet");
+        let metadata_set = writer.create_element("MetadataSet");
         metadata_set
             .with_attribute(Attribute::from(("containerField", "metadata")))
             .write_inner_content(|writer| {
@@ -135,7 +135,7 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The XML writer to which the shape node will be added.
     /// * `part` - The shape part to be written out as shape.
     fn write_part<W: Write>(writer: &mut Writer<W>, part: &ShapePart) -> Result<(), XMLError> {
-        let mut shape = writer.create_element("Shape");
+        let shape = writer.create_element("Shape");
 
         shape.write_inner_content(|writer| {
             // write material
@@ -147,7 +147,7 @@ impl<'a> X3DExporter<'a> {
                     writer
                         .create_element("Appearance")
                         .write_inner_content(|writer| {
-                            let mut xml_mat = writer.create_element("Material");
+                            let xml_mat = writer.create_element("Material");
                             xml_mat
                                 .with_attribute(Attribute::from((
                                     "diffuseColor",
@@ -164,7 +164,8 @@ impl<'a> X3DExporter<'a> {
                                         specular_color[0], specular_color[1], specular_color[2]
                                     )
                                     .as_str(),
-                                )));
+                                )))
+                                .write_empty()?;
 
                             Ok(())
                         })?;
@@ -274,9 +275,8 @@ mod tests {
 
         let mut data: Vec<u8> = Vec::new();
         {
-            let mut c = Cursor::new(&mut data);
-
-            let mut x = X3DExporter::new(&cad_data);
+            let c = Cursor::new(&mut data);
+            let x = X3DExporter::new(&cad_data);
             x.write(c).unwrap();
         }
 

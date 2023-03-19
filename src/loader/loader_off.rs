@@ -288,8 +288,6 @@ impl Loader for LoaderOff {
 
 #[cfg(test)]
 mod tests {
-    use std::{fmt::Debug, io::Cursor};
-
     use nalgebra_glm::{cross, Vec3, U3};
 
     use crate::loader::MemoryResource;
