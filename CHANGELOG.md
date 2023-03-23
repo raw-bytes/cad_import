@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unpublished]
 
+## [0.3.0]
+
 ### Added
 - New resource interface for accessing resources
 - Support for non-indexed primitives
