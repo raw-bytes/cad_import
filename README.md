@@ -7,8 +7,9 @@ The goals of this library is:
 - Representation in uniform in-memory structure
 
 ## Supported formats
-- Object File Format: Extensions=*.off, Mime-Types=model/vnd.off] (see https://segeval.cs.princeton.edu/public/off_format.html)
-- glTF RUNTIME 3D ASSET DELIVERY: Extensions=\*.gltf,\*.glb, Mime-Types=model/gltf-binary,model/gltf+json] (see https://www.khronos.org/gltf/)
+- Object File Format: Extensions=*.off, Mime-Types=model/vnd.off (see https://segeval.cs.princeton.edu/public/off_format.html)
+- glTF RUNTIME 3D ASSET DELIVERY: Extensions=\*.gltf,\*.glb, Mime-Types=model/gltf-binary,model/gltf+json (see https://www.khronos.org/gltf/)
+- AVEVA PDMS binary RVM: Extensions=\*.rvm, Mime-Types=application/vnd.aveva.pdm.rvm (see https://en.wikipedia.org/wiki/PDMS_(software))
 
 ## Changelog
 For changes see [Change Log](./CHANGELOG.md)
