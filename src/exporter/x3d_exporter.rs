@@ -258,6 +258,8 @@ impl<'a> X3DExporter<'a> {
 mod tests {
     use std::io::Cursor;
 
+    use itertools::EitherOrBoth;
+
     use crate::loader::{loader_off::LoaderOff, Loader, MemoryResource};
 
     use super::*;
@@ -282,6 +284,33 @@ mod tests {
         }
 
         let s = String::from_utf8(data).unwrap();
-        println!("{}", s);
+
+        let ref_xml = "
+        <X3D>
+            <Scene DEF=\"scene\">
+                <MatrixTransform matrix=\"1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\">
+                <MetadataSet containerField=\"metadata\">
+                    <MetadataString containerField=\"value\" name=\"Name\" value=\"root\"/>
+                </MetadataSet>
+                <Shape>
+                    <IndexedTriangleSet index=\"0 1 3 0 3 2 2 3 5 2 5 4 4 5 7 4 7 6 6 7 1 6 1 0 1 7 5 1 5 3 6 0 2 6 2 4\">
+                    <Coordinate point=\"-0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5\"/>
+                    </IndexedTriangleSet>
+                </Shape>
+                </MatrixTransform>
+            </Scene>
+        </X3D>
+        ";
+
+        for e in s.split_whitespace().zip_longest(ref_xml.split_whitespace()) {
+            match e {
+                EitherOrBoth::Both(w0, w1) => {
+                    assert_eq!(w0, w1);
+                }
+                _ => panic!("XML is invalid"),
+            }
+        }
+
+        // let m = extract_cube_data(s.as_str());
     }
 }
