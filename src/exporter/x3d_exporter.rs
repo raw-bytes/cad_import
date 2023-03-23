@@ -11,6 +11,7 @@ use crate::{
     Error,
 };
 
+/// An exporter into the X3D format. (see https://www.web3d.org/specifications/)
 pub struct X3DExporter<'a> {
     cad_data: &'a CADData,
 }
