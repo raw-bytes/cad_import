@@ -1,4 +1,5 @@
 use std::{
+    collections::{BTreeMap, BTreeSet},
     fmt::Display,
     io::{BufRead, BufReader, Error as IOError},
     iter::Peekable,
@@ -10,12 +11,15 @@ use crate::{
     basic_types::RGBA,
     error::Error,
     structure::{
-        CADData, Colors, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives, Shape,
-        ShapePart, Vertices,
+        CADData, Colors, IndexData, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives,
+        Shape, ShapePart, Vertices,
     },
 };
 
-use super::loader::Loader;
+use super::{
+    loader::{ExtensionMap, Loader},
+    Resource,
+};
 
 use log::{debug, trace};
 
@@ -214,7 +218,7 @@ impl LoaderOff {
         }
 
         // create the primitives
-        let primitives = Primitives::new(indices, PrimitiveType::Triangles)?;
+        let primitives = Primitives::new(IndexData::Indices(indices), PrimitiveType::Triangles)?;
 
         Ok(primitives)
     }
@@ -241,8 +245,15 @@ impl LoaderOff {
 }
 
 impl Loader for LoaderOff {
-    fn get_extensions(&self) -> Vec<String> {
-        vec!["off".to_owned()]
+    fn get_extensions_mime_type_map(&self) -> ExtensionMap {
+        let mut ext_map = BTreeMap::new();
+
+        ext_map.insert(
+            "off".to_owned(),
+            BTreeSet::from(["model/vnd.off".to_owned()]),
+        );
+
+        ext_map
     }
 
     fn get_mime_types(&self) -> Vec<String> {
@@ -257,7 +268,8 @@ impl Loader for LoaderOff {
         1000
     }
 
-    fn read_file(&self, reader: &mut dyn std::io::Read) -> Result<CADData, Error> {
+    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+        let reader = resource.open().unwrap();
         let reader = BufReader::new(reader);
         let mut lines = reader.lines().enumerate();
 
@@ -277,6 +289,8 @@ impl Loader for LoaderOff {
 #[cfg(test)]
 mod tests {
     use nalgebra_glm::{cross, Vec3, U3};
+
+    use crate::loader::MemoryResource;
 
     use super::*;
 
@@ -325,10 +339,11 @@ mod tests {
     fn test_cube() {
         let s = include_str!("test_data/cube.off");
 
-        let mut reader = BufReader::new(s.as_bytes());
+        let r = MemoryResource::new(s.as_bytes(), "model/vnd.off".to_owned());
+
         let loader = LoaderOff::new();
 
-        let cad_data = loader.read_file(&mut reader).unwrap();
+        let cad_data = loader.read(&r).unwrap();
         let root_node = cad_data.get_root_node();
         assert!(root_node.is_leaf());
 
@@ -358,7 +373,10 @@ mod tests {
         assert_eq!(min, Vec3::new(-0.5f32, -0.5f32, -0.5f32));
         assert_eq!(max, Vec3::new(0.5f32, 0.5f32, 0.5f32));
 
-        let area = compute_area(vertices.get_positions(), primitives.get_raw_index_data());
+        let area = compute_area(
+            vertices.get_positions(),
+            primitives.get_raw_index_data().get_indices_ref().unwrap(),
+        );
         assert!((area - 6f32).abs() <= 1e-6f32);
     }
 }

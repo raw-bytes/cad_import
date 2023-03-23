@@ -13,7 +13,8 @@
 //!     let manager = Manager::new();
 //!
 //!     for loader in manager.get_loader_list().iter() {
-//!         let extensions: String = loader.get_extensions().join(",");
+//!         let extensions: Vec<String> = loader.get_extensions_mime_type_map().keys().map(|s| s.clone()).collect();
+//!         let extensions: String = extensions.join(",");
 //!         let mime_types: String = loader.get_mime_types().join(",");
 //!         println!(
 //!             "Loader {}: Extensions=[{}], Mime-Types=[{}] ",
@@ -28,7 +29,7 @@
 //! In order to load a specific file see the following code
 //! ```rust
 //! use cad_import::loader::Manager;
-//! use std::fs::File;
+//! use std::{fs::File, path::Path};
 //! use std::env;
 //!
 //! fn main() {
@@ -43,17 +44,18 @@
 //!     if args.len() != 2 {
 //!       println!("USAGE: <FILE-PATH>");
 //!     } else {
-//!         let file_path = &args[1];
-//!         let mut reader = File::open(file_path).unwrap();
+//!         let file_path = Path::new(&args[1]);
 //!
-//!         let cad_data = loader.read_file(&mut reader);
+//!         let cad_data = loader.read_file(&file_path, mime_type);
 //!     }
 //! }
 //! ```
 mod basic_types;
 mod error;
+
 pub mod loader;
 pub mod structure;
+pub mod exporter;
 
 pub use basic_types::*;
 pub use error::Error;

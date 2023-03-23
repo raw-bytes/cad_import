@@ -1,13 +1,13 @@
 [package]
 name = "cad_import"
-version = "0.2.1"
+version = "0.3.0"
 readme = "README.md"
 license = "MIT"
 authors = ["sraesch"]
 
 description = "A simple library for importing CAD data from different formats into a uniform in-memory structure."
 documentation = "https://docs.rs/cad_import/"
-repository = "https://github.com/sraesch/cad_import"
+repository = "https://github.com/raw-bytes/cad_import"
 
 keywords = ["3D", "CAD", "import", "model", "scene"]
 categories = ["data-structures"]
@@ -15,6 +15,13 @@ categories = ["data-structures"]
 edition = "2021"
 
 [dependencies]
+gltf = "1.1"
 quick-error = "2.0"
 nalgebra-glm = "0.3"
 log = "0.4"
+quick-xml = "0.28"
+itertools = "0.10"
+
+[dev-dependencies]
+path-clean = "1.0"
+byteorder = "1.4"

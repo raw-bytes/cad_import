@@ -8,6 +8,7 @@ The goals of this library is:
 
 ## Supported formats
 - Object File Format: Extensions=*.off, Mime-Types=model/vnd.off] (see https://segeval.cs.princeton.edu/public/off_format.html)
+- glTF RUNTIME 3D ASSET DELIVERY: Extensions=\*.gltf,\*.glb, Mime-Types=model/gltf-binary,model/gltf+json] (see https://www.khronos.org/gltf/)
 
 ## Changelog
 For changes see [Change Log](./CHANGELOG.md)
