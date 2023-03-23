@@ -3,7 +3,10 @@ use std::{
     rc::Rc,
 };
 
-use super::{loader::Loader, loader_gltf::LoaderGLTF, loader_off::LoaderOff, ExtensionMap};
+use super::{
+    loader::Loader, loader_gltf::LoaderGLTF, loader_off::LoaderOff, loader_rvm::LoaderRVM,
+    ExtensionMap,
+};
 
 #[derive(Clone)]
 struct LoaderEntry {
@@ -69,6 +72,7 @@ impl Manager {
         // register loaders here...
         result.register_loader(Box::new(LoaderOff::new()));
         result.register_loader(Box::new(LoaderGLTF::new()));
+        result.register_loader(Box::new(LoaderRVM::new()));
 
         result
     }
