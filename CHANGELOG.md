@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Support for length units (see https://github.com/raw-bytes/cad_import/issues/13)
 - Added new metadata concept (see https://github.com/raw-bytes/cad_import/issues/11)
+- Added RVM loader (see https://github.com/raw-bytes/cad_import/issues/12)
 
-## [0.3.0]
+## [0.3.0] - 2023-03-23
 
 ### Added
 - New resource interface for accessing resources
