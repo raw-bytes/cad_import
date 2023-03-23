@@ -75,13 +75,14 @@ impl<'a> X3DExporter<'a> {
     fn write_node<W: Write>(&self, writer: &mut Writer<W>, node: &Node) -> Result<(), XMLError> {
         // create the serialized string for the transformation matrix
         let m = node.get_transform().unwrap_or(Mat4::identity());
-        let matrix_string: String = m
-            .column_iter()
-            .map(|c| format!("{} {} {} {}", c[0], c[1], c[2], c[3]))
-            .intersperse(" ".to_owned())
-            .collect();
+        let matrix_string: String = Itertools::intersperse(
+            m.column_iter()
+                .map(|c| format!("{} {} {} {}", c[0], c[1], c[2], c[3])),
+            " ".to_owned(),
+        )
+        .collect();
 
-        let mut group = writer
+        let group = writer
             .create_element("MatrixTransform")
             .with_attribute(Attribute::from(("matrix", matrix_string.as_str())));
 
@@ -112,7 +113,7 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The writer to which the metadata set will be added
     /// * `label` - The node label which is added to the metadata set.
     fn write_label<W: Write>(writer: &mut Writer<W>, label: &str) -> Result<(), XMLError> {
-        let mut metadata_set = writer.create_element("MetadataSet");
+        let metadata_set = writer.create_element("MetadataSet");
         metadata_set
             .with_attribute(Attribute::from(("containerField", "metadata")))
             .write_inner_content(|writer| {
@@ -135,7 +136,7 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The XML writer to which the shape node will be added.
     /// * `part` - The shape part to be written out as shape.
     fn write_part<W: Write>(writer: &mut Writer<W>, part: &ShapePart) -> Result<(), XMLError> {
-        let mut shape = writer.create_element("Shape");
+        let shape = writer.create_element("Shape");
 
         shape.write_inner_content(|writer| {
             // write material
@@ -147,7 +148,7 @@ impl<'a> X3DExporter<'a> {
                     writer
                         .create_element("Appearance")
                         .write_inner_content(|writer| {
-                            let mut xml_mat = writer.create_element("Material");
+                            let xml_mat = writer.create_element("Material");
                             xml_mat
                                 .with_attribute(Attribute::from((
                                     "diffuseColor",
@@ -164,7 +165,8 @@ impl<'a> X3DExporter<'a> {
                                         specular_color[0], specular_color[1], specular_color[2]
                                     )
                                     .as_str(),
-                                )));
+                                )))
+                                .write_empty()?;
 
                             Ok(())
                         })?;
@@ -200,11 +202,9 @@ impl<'a> X3DExporter<'a> {
                     .write_inner_content(|w| Self::write_vertices(w, vertices))?;
             }
             (PrimitiveType::Triangles, IndexData::Indices(indices)) => {
-                let index_str: String = indices
-                    .iter()
-                    .map(|i| i.to_string())
-                    .intersperse(" ".to_owned())
-                    .collect();
+                let index_str: String =
+                    Itertools::intersperse(indices.iter().map(|i| i.to_string()), " ".to_owned())
+                        .collect();
 
                 writer
                     .create_element("IndexedTriangleSet")
@@ -246,15 +246,19 @@ impl<'a> X3DExporter<'a> {
     where
         I: Iterator<Item = Vec3>,
     {
-        vecs.map(|v| format!("{} {} {}", v[0], v[1], v[2]))
-            .intersperse(" ".to_owned())
-            .collect()
+        Itertools::intersperse(
+            vecs.map(|v| format!("{} {} {}", v[0], v[1], v[2])),
+            " ".to_owned(),
+        )
+        .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::io::Cursor;
+
+    use itertools::EitherOrBoth;
 
     use crate::loader::{loader_off::LoaderOff, Loader, MemoryResource};
 
@@ -274,13 +278,39 @@ mod tests {
 
         let mut data: Vec<u8> = Vec::new();
         {
-            let mut c = Cursor::new(&mut data);
-
-            let mut x = X3DExporter::new(&cad_data);
+            let c = Cursor::new(&mut data);
+            let x = X3DExporter::new(&cad_data);
             x.write(c).unwrap();
         }
 
         let s = String::from_utf8(data).unwrap();
-        println!("{}", s);
+
+        let ref_xml = "
+        <X3D>
+            <Scene DEF=\"scene\">
+                <MatrixTransform matrix=\"1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1\">
+                <MetadataSet containerField=\"metadata\">
+                    <MetadataString containerField=\"value\" name=\"Name\" value=\"root\"/>
+                </MetadataSet>
+                <Shape>
+                    <IndexedTriangleSet index=\"0 1 3 0 3 2 2 3 5 2 5 4 4 5 7 4 7 6 6 7 1 6 1 0 1 7 5 1 5 3 6 0 2 6 2 4\">
+                    <Coordinate point=\"-0.5 -0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 0.5 0.5 0.5 -0.5 0.5 -0.5 0.5 0.5 -0.5 -0.5 -0.5 -0.5 0.5 -0.5 -0.5\"/>
+                    </IndexedTriangleSet>
+                </Shape>
+                </MatrixTransform>
+            </Scene>
+        </X3D>
+        ";
+
+        for e in s.split_whitespace().zip_longest(ref_xml.split_whitespace()) {
+            match e {
+                EitherOrBoth::Both(w0, w1) => {
+                    assert_eq!(w0, w1);
+                }
+                _ => panic!("XML is invalid"),
+            }
+        }
+
+        // let m = extract_cube_data(s.as_str());
     }
 }

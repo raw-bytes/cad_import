@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for non-indexed primitives
 - Added export functionality to the X3D format
 - Added example program to convert data to X3D
+- Added GLTF loader
 
 ### Changed
 - Changed the resource extension handling

@@ -3,7 +3,7 @@ use std::{
     rc::Rc,
 };
 
-use super::{loader::Loader, loader_off::LoaderOff, ExtensionMap};
+use super::{loader::Loader, loader_gltf::LoaderGLTF, loader_off::LoaderOff, ExtensionMap};
 
 #[derive(Clone)]
 struct LoaderEntry {
@@ -68,6 +68,7 @@ impl Manager {
 
         // register loaders here...
         result.register_loader(Box::new(LoaderOff::new()));
+        result.register_loader(Box::new(LoaderGLTF::new()));
 
         result
     }
@@ -268,7 +269,7 @@ mod tests {
         assert_eq!(loader.get_name(), "Object File Format");
 
         let loaders = manager.get_loader_list();
-        assert_eq!(loaders.len(), 1);
+        assert_eq!(loaders.len(), 2);
     }
 
     #[test]
