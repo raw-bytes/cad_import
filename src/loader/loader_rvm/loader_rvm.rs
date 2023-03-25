@@ -1,7 +1,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use log::{debug, error};
+
 use crate::{
-    loader::{ExtensionMap, Loader},
+    loader::{
+        loader_rvm::{cad_data_creator::CADDataCreator, rvm_parser::RVMParser},
+        ExtensionMap, Loader,
+    },
     structure::CADData,
     Error,
 };
@@ -40,6 +45,30 @@ impl Loader for LoaderRVM {
     }
 
     fn read(&self, resource: &dyn crate::loader::Resource) -> Result<CADData, Error> {
-        todo!()
+        let mut cad_creator = CADDataCreator::new();
+
+        {
+            let reader = resource.open()?;
+            let mut parser = RVMParser::new(reader, &mut cad_creator);
+
+            debug!("Start parsing {}...", resource.to_string());
+            match parser.parse() {
+                Ok(_) => {
+                    debug!("Start parsing {}...DONE", resource.to_string());
+                }
+                Err(err) => {
+                    error!("Start parsing {}...FAILED", resource.to_string());
+                    error!("Parsing failed due to {}", err);
+
+                    return Err(err);
+                }
+            }
+        }
+
+        debug!("Create cad data from the cad creator...");
+        let cad_data = cad_creator.to_cad_data();
+        debug!("Create cad data from the cad creator...DONE");
+
+        Ok(cad_data)
     }
 }
