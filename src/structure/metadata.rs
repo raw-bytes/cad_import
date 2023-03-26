@@ -67,7 +67,16 @@ impl Display for MetaDataValue {
 /// A metadata set consisting of key-value pair
 pub type MetaDataSet = BTreeMap<String, MetaDataValue>;
 
-/// A single meta data node
+/// A meta data node tha can be attached to a structure node.
+///
+/// Metadata is additional data that can be assigned to the nodes of the structure tree.
+/// Metadata consists primarily of key-value pairs, e.g.,`tolerance = 1.5`, `unit = meter`, etc.
+/// As multiple nodes can have common metadata, a hierarchical structure can be defined.
+/// For example, two nodes n0 and n1 could both have the common metadata key-value pair
+/// `unit = meter`.
+/// Therefore, the nodes n0 and n1 could have respective metadata nodes m0 and m1 which have both
+/// the common metadata node common as parent, like inheriting metadata.
+/// The child metadata node always overrides the values of the parent node if keys are equivalent.
 pub struct MetaDataNode {
     parent: Weak<MetaDataNode>,
     data: MetaDataSet,
@@ -85,10 +94,12 @@ impl MetaDataNode {
         }
     }
 
-    /// Returns a new meta data node containing the given meta data set.
+    /// Returns a new meta data node containing the given meta data set with the given parent
+    /// metadata node.
     ///
     /// # Arguments
     /// * `data` - The meta data to store in the node
+    /// * `parent` - The parent meta data node.
     pub fn new_with_parent(data: MetaDataSet, parent: Arc<MetaDataNode>) -> Self {
         Self {
             parent: Arc::downgrade(&parent),
