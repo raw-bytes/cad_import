@@ -8,7 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unpublished]
 
 ### Added
-- Support for length units
+- Support for length units (see https://github.com/raw-bytes/cad_import/issues/13)
+- Added new metadata concept (see https://github.com/raw-bytes/cad_import/issues/11)
 
 ## [0.3.1]
 
