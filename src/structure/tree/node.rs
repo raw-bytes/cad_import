@@ -1,13 +1,14 @@
 use std::{
     fmt::{Debug, Display},
     rc::Rc,
+    sync::Arc,
 };
 
 use nalgebra_glm::Mat4;
 
 use crate::{
     basic_types::{IDCounter, ID},
-    structure::Shape,
+    structure::{MetaDataNode, Shape},
 };
 
 static ID_COUNTER: IDCounter = IDCounter::new();
@@ -16,6 +17,7 @@ static ID_COUNTER: IDCounter = IDCounter::new();
 pub struct Node {
     id: u64,
     label: String,
+    metadata: Option<Arc<MetaDataNode>>,
     transform: Option<Mat4>,
     shapes: Vec<Rc<Shape>>,
     children: Vec<Node>,
@@ -32,6 +34,7 @@ impl Node {
         Self {
             id,
             label,
+            metadata: None,
             transform: None,
             shapes: Vec::new(),
             children: Vec::new(),
@@ -51,6 +54,19 @@ impl Node {
     /// Returns a reference onto the label of the node.
     pub fn get_label(&self) -> &str {
         &self.label
+    }
+
+    /// Returns the metadata node attached to this node.
+    pub fn get_metadata(&self) -> Option<Arc<MetaDataNode>> {
+        self.metadata.clone()
+    }
+
+    /// Sets the metadata of this node.
+    ///
+    /// # Arguments
+    /// * `metadata` - The metadata to set for this node.
+    pub fn set_metadata(&mut self, metadata: Arc<MetaDataNode>) {
+        self.metadata = Some(metadata);
     }
 
     /// Adds the given node as child.
