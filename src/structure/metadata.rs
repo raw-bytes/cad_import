@@ -64,7 +64,7 @@ impl Display for MetaDataValue {
     }
 }
 
-/// A metadata set consisting of key-value pairs
+/// A metadata set consisting of key-value pair
 pub type MetaDataSet = BTreeMap<String, MetaDataValue>;
 
 /// A single meta data node
