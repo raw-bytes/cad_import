@@ -1,5 +1,6 @@
 use super::EnumValue;
 
+/// A single value for a parameter in the options.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
     Integer(i64),
