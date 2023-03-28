@@ -3,10 +3,17 @@ use super::EnumValue;
 /// A single value for a parameter in the options.
 #[derive(Clone, PartialEq, Debug)]
 pub enum Value {
+    Bool(bool),
     Integer(i64),
     Float(f64),
     Text(String),
     Enum(EnumValue),
+}
+
+impl From<bool> for Value {
+    fn from(value: bool) -> Self {
+        Self::Bool(value)
+    }
 }
 
 impl From<i32> for Value {
