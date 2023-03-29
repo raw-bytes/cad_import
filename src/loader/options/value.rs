@@ -12,6 +12,17 @@ pub enum Value {
     Enum(EnumValue),
 }
 
+impl Value {
+    /// Returns true if the stored value is a number, i.e., integer or float.
+    pub fn is_number(&self) -> bool {
+        match self {
+            Value::Integer(_) => true,
+            Value::Float(_) => true,
+            _ => false,
+        }
+    }
+}
+
 impl From<bool> for Value {
     fn from(value: bool) -> Self {
         Self::Bool(value)
