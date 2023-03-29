@@ -100,6 +100,7 @@ impl Descriptor {
 }
 
 /// A description for a set of options.
+#[derive(Clone)]
 pub struct OptionsDescriptor {
     options: Vec<Descriptor>,
 }
@@ -130,6 +131,14 @@ impl OptionsDescriptor {
     /// Returns a reference onto the descriptors.
     pub fn get_options(&self) -> &[Descriptor] {
         &self.options
+    }
+
+    /// Returns a descriptor for the specified option if available or none otherwise.
+    ///
+    /// # Arguments
+    /// * `name` - The name of the option to search and return.
+    pub fn get_option(&self, name: &str) -> Option<&Descriptor> {
+        self.options.iter().find(|o| o.get_name() == name)
     }
 }
 
