@@ -5,7 +5,7 @@ use std::{
 
 use crate::{error::Error, structure::CADData};
 
-use super::{FileResource, OptionsDescriptor, Resource};
+use super::{FileResource, LoaderOptions, OptionsDescriptor, Resource};
 
 pub type ExtensionMap = BTreeMap<String, BTreeSet<String>>;
 
@@ -27,12 +27,26 @@ pub trait Loader {
     /// Returns a description for the loader options if available.
     fn get_loader_options(&self) -> Option<OptionsDescriptor>;
 
+    /// Reads the CAD data with provided loader options from the given reader. If something
+    /// happens, the loader will return a error message.
+    ///
+    /// # Arguments
+    /// * `reader` - The reader from which the loader will read the cad data.
+    /// * `options` - Optionally provide loader options.
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        options: Option<LoaderOptions>,
+    ) -> Result<CADData, Error>;
+
     /// Reads the CAD data from the given reader. If something happens, the loader will return
     /// a error message.
     ///
     /// # Arguments
     /// * `reader` - The reader from which the loader will read the cad data.
-    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error>;
+    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+        self.read_with_options(resource, None)
+    }
 
     /// Reads the CAD data from the given path. If something happens, the loader will return
     /// a error message.
@@ -42,5 +56,21 @@ pub trait Loader {
     fn read_file(&self, p: &Path, mime_type: &str) -> Result<CADData, Error> {
         let f = FileResource::new(p.to_owned(), mime_type);
         self.read(&f)
+    }
+
+    /// Reads the CAD data from the given path with the provided loader options. If something
+    /// happens, the loader will return a error message.
+    ///
+    /// # Arguments
+    /// * `p` - The path from which the loader will read the cad data.
+    /// * `options` - Optionally provide loader options.
+    fn read_file_with_options(
+        &self,
+        p: &Path,
+        mime_type: &str,
+        options: Option<LoaderOptions>,
+    ) -> Result<CADData, Error> {
+        let f = FileResource::new(p.to_owned(), mime_type);
+        self.read_with_options(&f, options)
     }
 }

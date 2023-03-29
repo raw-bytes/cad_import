@@ -135,7 +135,11 @@ impl Loader for LoaderGLTF {
         None
     }
 
-    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        _: Option<crate::loader::LoaderOptions>,
+    ) -> Result<CADData, Error> {
         let buffer = resource.read_to_memory()?;
 
         let gltf_data = match Gltf::from_slice(&buffer) {

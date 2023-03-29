@@ -272,7 +272,11 @@ impl Loader for LoaderOff {
         None
     }
 
-    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        _: Option<super::LoaderOptions>,
+    ) -> Result<CADData, Error> {
         let reader = resource.open().unwrap();
         let reader = BufReader::new(reader);
         let mut lines = reader.lines().enumerate();
