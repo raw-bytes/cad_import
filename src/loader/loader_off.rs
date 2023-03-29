@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     loader::{ExtensionMap, Loader},
-    Resource,
+    OptionsDescriptor, Resource,
 };
 
 use log::{debug, trace};
@@ -266,6 +266,10 @@ impl Loader for LoaderOff {
 
     fn get_priority(&self) -> u32 {
         1000
+    }
+
+    fn get_loader_options(&self) -> Option<OptionsDescriptor> {
+        None
     }
 
     fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {

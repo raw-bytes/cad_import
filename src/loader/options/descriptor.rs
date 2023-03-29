@@ -99,7 +99,7 @@ impl Descriptor {
     }
 }
 
-/// A description for loader options.
+/// A description for a set of options.
 pub struct OptionsDescriptor {
     options: Vec<Descriptor>,
 }
