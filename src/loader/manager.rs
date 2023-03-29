@@ -1,5 +1,5 @@
 use std::{
-    collections::{BinaryHeap, HashMap, BTreeSet},
+    collections::{BTreeSet, BinaryHeap, HashMap},
     rc::Rc,
 };
 
@@ -126,9 +126,7 @@ impl Manager {
         let ext = ext.to_lowercase();
 
         match self.map_ext.get(&ext) {
-            Some(lst) => {
-                Vec::from_iter(lst.iter().map(|s| s.clone()))
-            }
+            Some(lst) => Vec::from_iter(lst.iter().map(|s| s.clone())),
             None => Vec::new(),
         }
     }
@@ -203,6 +201,10 @@ mod tests {
             self.priority
         }
 
+        fn get_loader_options(&self) -> Option<crate::loader::OptionsDescriptor> {
+            None
+        }
+
         fn read(&self, _resource: &dyn Resource) -> Result<CADData, Error> {
             todo!()
         }
@@ -218,7 +220,10 @@ mod tests {
 
         let l = FakeLoader::new(
             "loader1".to_owned(),
-            BTreeMap::from([("foobar".to_owned(), BTreeSet::from(["foobar/x-test".to_owned()]))]),
+            BTreeMap::from([(
+                "foobar".to_owned(),
+                BTreeSet::from(["foobar/x-test".to_owned()]),
+            )]),
             vec!["foobar/x-test".to_owned()],
             42,
         );
@@ -231,7 +236,10 @@ mod tests {
 
         let l2 = FakeLoader::new(
             "loader2".to_owned(),
-            BTreeMap::from([("foobar".to_owned(), BTreeSet::from(["foobar/x-test".to_owned()]))]),
+            BTreeMap::from([(
+                "foobar".to_owned(),
+                BTreeSet::from(["foobar/x-test".to_owned()]),
+            )]),
             vec!["foobar/x-test".to_owned()],
             43,
         );
@@ -244,12 +252,16 @@ mod tests {
         assert!(m.get_mime_types_for_extension("FOob").is_empty());
 
         assert_eq!(
-            m.get_loader_by_mime_type("foobar/x-test").unwrap().get_priority(),
+            m.get_loader_by_mime_type("foobar/x-test")
+                .unwrap()
+                .get_priority(),
             43
         );
 
         assert_eq!(
-            m.get_loader_by_mime_type("foobar/x-test").unwrap().get_name(),
+            m.get_loader_by_mime_type("foobar/x-test")
+                .unwrap()
+                .get_name(),
             "loader2"
         );
 

@@ -1,8 +1,11 @@
-use std::{path::Path, collections::{BTreeMap, BTreeSet}};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    path::Path,
+};
 
 use crate::{error::Error, structure::CADData};
 
-use super::{FileResource, Resource};
+use super::{FileResource, OptionsDescriptor, Resource};
 
 pub type ExtensionMap = BTreeMap<String, BTreeSet<String>>;
 
@@ -20,6 +23,9 @@ pub trait Loader {
 
     /// Returns list of supported mime types for the formats the loader is supporting.
     fn get_mime_types(&self) -> Vec<String>;
+
+    /// Returns a description for the loader options if available.
+    fn get_loader_options(&self) -> Option<OptionsDescriptor>;
 
     /// Reads the CAD data from the given reader. If something happens, the loader will return
     /// a error message.

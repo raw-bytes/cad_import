@@ -18,7 +18,7 @@ use log::{debug, warn};
 use nalgebra_glm::{Mat4, Vec3};
 
 use crate::{
-    loader::{Loader, Resource},
+    loader::{Loader, OptionsDescriptor, Resource},
     structure::{
         CADData, IndexData, Material, Mesh, Node, Normals, PhongMaterialData, Positions,
         PrimitiveType, Primitives, Shape, ShapePart, Vertices,
@@ -129,6 +129,10 @@ impl Loader for LoaderGLTF {
 
     fn get_priority(&self) -> u32 {
         1000
+    }
+
+    fn get_loader_options(&self) -> Option<OptionsDescriptor> {
+        None
     }
 
     fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {

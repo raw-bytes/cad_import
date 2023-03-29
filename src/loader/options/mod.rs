@@ -2,4 +2,6 @@ mod descriptor;
 mod enum_value;
 mod value;
 
-pub use enum_value::{EnumDescriptor, EnumValue};
+pub use descriptor::*;
+pub use enum_value::*;
+pub use value::*;
