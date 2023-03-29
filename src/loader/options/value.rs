@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use super::EnumValue;
 
 /// A single value for a parameter in the options.
@@ -61,5 +63,17 @@ impl From<&str> for Value {
 impl From<EnumValue> for Value {
     fn from(value: EnumValue) -> Self {
         Self::Enum(value)
+    }
+}
+
+impl Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::Bool(x) => write!(f, "{}", x),
+            Value::Integer(x) => write!(f, "{}", x),
+            Value::Float(x) => write!(f, "{}", x),
+            Value::Text(x) => write!(f, "{}", x),
+            Value::Enum(x) => write!(f, "{}", x),
+        }
     }
 }
