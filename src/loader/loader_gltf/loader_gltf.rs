@@ -18,7 +18,7 @@ use log::{debug, warn};
 use nalgebra_glm::{Mat4, Vec3};
 
 use crate::{
-    loader::{Loader, Resource},
+    loader::{Loader, OptionsDescriptor, Resource},
     structure::{
         CADData, IndexData, Material, Mesh, Node, Normals, PhongMaterialData, Positions,
         PrimitiveType, Primitives, Shape, ShapePart, Vertices,
@@ -131,7 +131,15 @@ impl Loader for LoaderGLTF {
         1000
     }
 
-    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+    fn get_loader_options(&self) -> Option<OptionsDescriptor> {
+        None
+    }
+
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        _: Option<crate::loader::Options>,
+    ) -> Result<CADData, Error> {
         let buffer = resource.read_to_memory()?;
 
         let gltf_data = match Gltf::from_slice(&buffer) {

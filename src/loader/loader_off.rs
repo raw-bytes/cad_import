@@ -18,7 +18,7 @@ use crate::{
 
 use super::{
     loader::{ExtensionMap, Loader},
-    Resource,
+    OptionsDescriptor, Resource,
 };
 
 use log::{debug, trace};
@@ -268,7 +268,15 @@ impl Loader for LoaderOff {
         1000
     }
 
-    fn read(&self, resource: &dyn Resource) -> Result<CADData, Error> {
+    fn get_loader_options(&self) -> Option<OptionsDescriptor> {
+        None
+    }
+
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        _: Option<super::Options>,
+    ) -> Result<CADData, Error> {
         let reader = resource.open().unwrap();
         let reader = BufReader::new(reader);
         let mut lines = reader.lines().enumerate();
