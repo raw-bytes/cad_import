@@ -14,11 +14,19 @@ pub enum Value {
 
 impl Value {
     /// Returns true if the stored value is a number, i.e., integer or float.
-    pub fn is_number(&self) -> bool {
+    pub const fn is_number(&self) -> bool {
         match self {
             Value::Integer(_) => true,
             Value::Float(_) => true,
             _ => false,
+        }
+    }
+
+    /// Tries to convert the value to an integer.
+    pub const fn to_integer(&self) -> Option<i64> {
+        match self {
+            Value::Integer(x) => Some(*x),
+            _ => None,
         }
     }
 }

@@ -208,7 +208,7 @@ mod tests {
         fn read_with_options(
             &self,
             _: &dyn Resource,
-            _: Option<crate::loader::LoaderOptions>,
+            _: Option<crate::loader::Options>,
         ) -> Result<CADData, Error> {
             todo!()
         }

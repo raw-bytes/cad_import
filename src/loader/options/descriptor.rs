@@ -1,8 +1,20 @@
-use std::collections::HashSet;
+use std::{
+    collections::HashSet,
+    fmt::Debug,
+    sync::atomic::{AtomicU32, Ordering},
+};
 
 use crate::Error;
 
 use super::value::Value;
+
+/// The id counter used to identify the options descriptors
+static DESCRIPTOR_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
+
+/// Returns a new generated options descriptor id.
+fn gen_descriptor_id() -> u32 {
+    DESCRIPTOR_ID_COUNTER.fetch_add(1, Ordering::Relaxed)
+}
 
 /// The validation checker callback checks if the given option value is valid.
 pub type ValidationChecker = fn(value: &Value) -> Result<(), String>;
@@ -99,9 +111,30 @@ impl Descriptor {
     }
 }
 
+impl Debug for Descriptor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "name={}, description={}, default={}, checker={}",
+            self.get_name(),
+            self.get_description(),
+            self.default_value,
+            if self.validation_checker.is_some() {
+                "YES"
+            } else {
+                "NO"
+            }
+        )
+    }
+}
+
 /// A description for a set of options.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OptionsDescriptor {
+    /// The globally unique identifier for the options descriptor
+    descriptor_id: u32,
+
+    /// The values for the options group
     options: Vec<Descriptor>,
 }
 
@@ -112,6 +145,7 @@ impl OptionsDescriptor {
     {
         let mut options_set: HashSet<String> = HashSet::new();
         let mut dst_options: Vec<Descriptor> = Vec::new();
+        let descriptor_id = gen_descriptor_id();
 
         for option in options {
             if !options_set.contains(option.get_name()) {
@@ -124,6 +158,7 @@ impl OptionsDescriptor {
         dst_options.reverse();
 
         Self {
+            descriptor_id,
             options: dst_options,
         }
     }
@@ -139,6 +174,21 @@ impl OptionsDescriptor {
     /// * `name` - The name of the option to search and return.
     pub fn get_option(&self, name: &str) -> Option<&Descriptor> {
         self.options.iter().find(|o| o.get_name() == name)
+    }
+
+    /// Returns the id of the options descriptor.
+    pub fn get_id(&self) -> u32 {
+        self.descriptor_id
+    }
+}
+
+impl PartialEq for OptionsDescriptor {
+    fn eq(&self, other: &Self) -> bool {
+        self.descriptor_id == other.descriptor_id
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        self.descriptor_id != other.descriptor_id
     }
 }
 

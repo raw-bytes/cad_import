@@ -4,46 +4,50 @@ use crate::Error;
 
 use super::{OptionsDescriptor, Value};
 
-pub struct LoaderOptions {
-    description: OptionsDescriptor,
+/// A group of options, i.e., a list of options defined by the options descriptor.
+#[derive(Clone)]
+pub struct OptionsGroup {
+    /// The descriptor for the options
+    descriptor: OptionsDescriptor,
+
+    /// The values for the options
     values: HashMap<String, Value>,
 }
 
-impl LoaderOptions {
-    /// Creates a new loader options with default values based on the provided options description.
+impl OptionsGroup {
+    /// Creates a new options group with default values based on the provided options descriptor.
     ///
     /// # Arguments
-    /// * `description` - The description for the loader options.
-    pub fn new(description: OptionsDescriptor) -> Self {
+    /// * `descriptor` - The descriptor for the options group.
+    pub fn new(descriptor: OptionsDescriptor) -> Self {
         let mut values = HashMap::new();
-        for d in description.get_options() {
+        for d in descriptor.get_options() {
             let name = d.get_name().to_owned();
             let value = d.get_default();
 
             values.insert(name, value);
         }
 
-        Self {
-            description,
-            values,
-        }
+        Self { descriptor, values }
     }
 
-    /// Returns a reference onto the internal options description.
-    pub fn get_description(&self) -> &OptionsDescriptor {
-        &self.description
+    /// Returns a reference onto the internal options descriptor.
+    pub fn get_descriptor(&self) -> &OptionsDescriptor {
+        &self.descriptor
     }
 
     /// Sets a new value for the specified option. Returns an error if the option is not defined or
     /// the value is invalid.
     ///
     /// # Arguments
+    /// * `name` - The name of the option for which the value will be set.
+    /// * `new_value` - The new value to set.
     pub fn set_value(&mut self, name: &str, new_value: Value) -> Result<(), Error> {
         match self.values.get_mut(name) {
             Some(dst_value) => {
                 // Try finding the descriptor for the given option.
                 // Note: Unwrap must work as the value with the same name exists in values map
-                let option = self.description.get_option(name).expect(&format!(
+                let option = self.descriptor.get_option(name).expect(&format!(
                     "Internal error: The descriptor for option {} must exists",
                     name
                 ));
@@ -104,14 +108,14 @@ mod tests {
             _ => Err(format!("Unsupported type")),
         };
 
-        let options_descriptions = [
+        let options_descriptor = [
             Descriptor::new_with_validator("a".to_owned(), "".to_owned(), Value::from(44), checker)
                 .unwrap(),
             Descriptor::new("b".to_owned(), "".to_owned(), Value::from(43)).unwrap(),
         ];
-        let options_descriptions = OptionsDescriptor::new(options_descriptions.iter());
+        let options_descriptor = OptionsDescriptor::new(options_descriptor.iter());
 
-        let mut options = LoaderOptions::new(options_descriptions.clone());
+        let mut options = OptionsGroup::new(options_descriptor.clone());
         assert_eq!(options.get_values().len(), 2);
 
         // check default values
