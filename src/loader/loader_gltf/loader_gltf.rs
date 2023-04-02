@@ -138,7 +138,7 @@ impl Loader for LoaderGLTF {
     fn read_with_options(
         &self,
         resource: &dyn Resource,
-        _: Option<crate::loader::LoaderOptions>,
+        _: Option<crate::loader::Options>,
     ) -> Result<CADData, Error> {
         let buffer = resource.read_to_memory()?;
 

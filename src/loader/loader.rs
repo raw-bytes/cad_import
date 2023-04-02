@@ -5,7 +5,7 @@ use std::{
 
 use crate::{error::Error, structure::CADData};
 
-use super::{FileResource, LoaderOptions, OptionsDescriptor, Resource};
+use super::{FileResource, Options, OptionsDescriptor, Resource};
 
 pub type ExtensionMap = BTreeMap<String, BTreeSet<String>>;
 
@@ -32,11 +32,11 @@ pub trait Loader {
     ///
     /// # Arguments
     /// * `reader` - The reader from which the loader will read the cad data.
-    /// * `options` - Optionally provide loader options.
+    /// * `options` - Optionally provide options loading resources.
     fn read_with_options(
         &self,
         resource: &dyn Resource,
-        options: Option<LoaderOptions>,
+        options: Option<Options>,
     ) -> Result<CADData, Error>;
 
     /// Reads the CAD data from the given reader. If something happens, the loader will return
@@ -63,12 +63,12 @@ pub trait Loader {
     ///
     /// # Arguments
     /// * `p` - The path from which the loader will read the cad data.
-    /// * `options` - Optionally provide loader options.
+    /// * `options` - Optionally provide options loading resources.
     fn read_file_with_options(
         &self,
         p: &Path,
         mime_type: &str,
-        options: Option<LoaderOptions>,
+        options: Option<Options>,
     ) -> Result<CADData, Error> {
         let f = FileResource::new(p.to_owned(), mime_type);
         self.read_with_options(&f, options)
