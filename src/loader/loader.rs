@@ -7,6 +7,7 @@ use crate::{error::Error, structure::CADData};
 
 use super::{FileResource, Options, OptionsDescriptor, Resource};
 
+/// A map with file extensions and a respective list of registered associated mime-types
 pub type ExtensionMap = BTreeMap<String, BTreeSet<String>>;
 
 /// The trait for a registered loader.
@@ -24,22 +25,22 @@ pub trait Loader {
     /// Returns list of supported mime types for the formats the loader is supporting.
     fn get_mime_types(&self) -> Vec<String>;
 
-    /// Returns a description for the loader options if available.
+    /// Returns a descriptor for the loader options if available.
     fn get_loader_options(&self) -> Option<OptionsDescriptor>;
 
-    /// Reads the CAD data with provided loader options from the given reader. If something
-    /// happens, the loader will return a error message.
+    /// Reads the CAD data with provided options from the given resource. If something
+    /// happens, the loader will return an error message.
     ///
     /// # Arguments
-    /// * `reader` - The reader from which the loader will read the cad data.
-    /// * `options` - Optionally provide options loading resources.
+    /// * `resource` - The resource from which the loader will read the cad data.
+    /// * `options` - Optionally, provide options loading resources.
     fn read_with_options(
         &self,
         resource: &dyn Resource,
         options: Option<Options>,
     ) -> Result<CADData, Error>;
 
-    /// Reads the CAD data from the given reader. If something happens, the loader will return
+    /// Reads the CAD data from the given resource. If something happens, the loader will return
     /// a error message.
     ///
     /// # Arguments
@@ -58,7 +59,7 @@ pub trait Loader {
         self.read(&f)
     }
 
-    /// Reads the CAD data from the given path with the provided loader options. If something
+    /// Reads the CAD data from the given path with the provided options. If something
     /// happens, the loader will return a error message.
     ///
     /// # Arguments
