@@ -288,7 +288,7 @@ impl Loader for LoaderOff {
 
 #[cfg(test)]
 mod tests {
-    use nalgebra_glm::{cross, Vec3, U3};
+    use nalgebra_glm::{cross, Vec3};
 
     use crate::loader::MemoryResource;
 
@@ -326,7 +326,7 @@ mod tests {
             let a = v1 - v0;
             let b = v2 - v0;
 
-            let n = cross::<_, U3>(&a, &b);
+            let n = cross(&a, &b);
 
             let area = nalgebra_glm::l2_norm(&n) * 0.5f32;
             total_area += area;
