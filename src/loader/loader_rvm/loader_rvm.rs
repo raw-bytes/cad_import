@@ -5,7 +5,7 @@ use log::{debug, error};
 use crate::{
     loader::{
         loader_rvm::{cad_data_creator::CADDataCreator, rvm_parser::RVMParser},
-        ExtensionMap, Loader,
+        ExtensionMap, Loader, Options, OptionsDescriptor, Resource,
     },
     structure::CADData,
     Error,
@@ -44,7 +44,11 @@ impl Loader for LoaderRVM {
         1000
     }
 
-    fn read(&self, resource: &dyn crate::loader::Resource) -> Result<CADData, Error> {
+    fn read_with_options(
+        &self,
+        resource: &dyn Resource,
+        _: Option<Options>,
+    ) -> Result<CADData, Error> {
         let mut cad_creator = CADDataCreator::new();
 
         {
@@ -70,5 +74,9 @@ impl Loader for LoaderRVM {
         debug!("Create cad data from the cad creator...DONE");
 
         Ok(cad_data)
+    }
+
+    fn get_loader_options(&self) -> Option<OptionsDescriptor> {
+        todo!()
     }
 }
