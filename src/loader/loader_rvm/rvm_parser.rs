@@ -3,6 +3,7 @@ use std::io::Read;
 use crate::Error;
 
 use byteorder::{BigEndian, ReadBytesExt};
+use itertools::Itertools;
 use log::{debug, trace};
 use nalgebra_glm::Vec3;
 
@@ -21,6 +22,17 @@ pub trait RVMInterpreter {
     /// # Arguments
     /// * `header` - The model header of the RVM file.
     fn model(&mut self, header: RVMModelHeader);
+
+    /// Called when a new group is being read.
+    ///
+    /// # Arguments
+    /// * `group_name` - The name of the group.
+    /// * `translation` - The translation of the group.
+    /// * `material_id` - The material id of the group.
+    fn begin_group(&mut self, group_name: String, translation: Vec3, material_id: usize);
+
+    /// Called when a group has been read completely.
+    fn end_group(&mut self);
 }
 
 /// The RVM header contains the information from the RVM file.
@@ -191,6 +203,8 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
     /// Reads a group node.
     fn read_group(&mut self) -> Result<(), Error> {
         self.skip_bytes(2)?; // garbage?
+        let version = self.read_u32()?;
+        trace!("Group Version: {}", version);
 
         let group_name = self.read_string()?;
         trace!("Group Name: {}", group_name);
@@ -201,7 +215,51 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
         let material_id = self.read_f32()? as usize;
         trace!("Material ID: {}", material_id);
 
-        unimplemented!("Read group");
+        self.interpreter
+            .begin_group(group_name, translation, material_id);
+
+        // read the children of the group
+        // Children
+        loop {
+            let id = self.read_until_valid_identifier()?;
+            if id.is_empty() || id == "CNTE" {
+                break;
+            }
+
+            if id == "CNTB" {
+                self.read_group()?;
+            } else if id == "PRIM" {
+                self.read_primitive()?;
+            } else {
+                return Err(Error::InvalidFormat(format!(
+                    "Unknown or invalid identifier {} found.",
+                    id
+                )));
+            }
+        }
+
+        self.skip_bytes(3)?; // garbage?
+        self.interpreter.end_group();
+
+        Ok(())
+    }
+
+    /// Reads a primitive node.
+    fn read_primitive(&mut self) -> Result<(), Error> {
+        self.skip_bytes(2)?; // garbage?
+
+        let version = self.read_u32()?;
+        trace!("Primitive Version: {}", version);
+
+        let primitive_type = self.read_u32()?;
+        trace!("Primitive Type: {}", primitive_type);
+
+        let matrix: [f32; 12] = self.read_f32_array()?;
+
+        // skip the bounding box
+        self.skip_bytes(6)?;
+
+        unimplemented!()
     }
 
     /// Reads an array of 32-bit floating point numbers.
@@ -239,7 +297,15 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
             let mut chars = vec![0u8; size];
             self.reader.read_exact(&mut chars)?;
 
-            Ok(String::from_utf8_lossy(&chars).to_string())
+            // remove trailing zeros
+            let chars = if let Some(end) = chars.iter().find_position(|c| **c == 0).map(|(i, _)| i)
+            {
+                &chars[..end]
+            } else {
+                &chars
+            };
+
+            Ok(String::from_utf8_lossy(chars).to_string())
         }
     }
 
@@ -250,6 +316,8 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
     ///                  num_dwords * 4 is the number of bytes to skip.
     fn skip_bytes(&mut self, num_dwords: u64) -> Result<(), Error> {
         let bytes_to_skip = num_dwords * 4;
+
+        // skip the the specified number of bytes
         std::io::copy(
             &mut self.reader.by_ref().take(bytes_to_skip),
             &mut std::io::sink(),

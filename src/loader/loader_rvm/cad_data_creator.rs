@@ -1,3 +1,5 @@
+use nalgebra_glm::Vec3;
+
 use crate::structure::CADData;
 
 use super::rvm_parser::{RVMHeader, RVMInterpreter, RVMModelHeader};
@@ -23,5 +25,16 @@ impl RVMInterpreter for CADDataCreator {
 
     fn model(&mut self, header: RVMModelHeader) {
         println!("Model: {:?}", header);
+    }
+
+    fn begin_group(&mut self, group_name: String, translation: Vec3, material_id: usize) {
+        println!(
+            "Group: {:?}, {:?}, {:?}",
+            group_name, translation, material_id
+        );
+    }
+
+    fn end_group(&mut self) {
+        println!("End group");
     }
 }
