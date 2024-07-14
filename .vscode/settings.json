@@ -1,11 +1,20 @@
 {
     "editor.formatOnSave": true,
     "cSpell.words": [
+        "Peekable",
+        "AVEVA",
+        "byteorder",
+        "CNTB",
+        "CNTE",
+        "COLR",
+        "dwords",
         "gltf",
         "itertools",
+        "MODL",
         "nalgebra",
-        "Peekable",
+        "PDMS",
         "Phong",
+        "Uninit",
         "vecs"
     ]
 }

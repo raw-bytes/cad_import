@@ -11,7 +11,7 @@ use gltf::{
 
 use super::utils::get_size_in_bytes;
 
-pub struct AccessorIterator<'a, Element: Copy> {
+pub struct AccessorIterator<'a, Element: Copy + Default> {
     element: PhantomData<Element>,
     buffer: &'a [u8],
     offset: usize,
@@ -20,13 +20,10 @@ pub struct AccessorIterator<'a, Element: Copy> {
     index: usize,
 }
 
-impl<'a, Element: Copy> AccessorIterator<'a, Element> {
+impl<'a, Element: Copy + Default> AccessorIterator<'a, Element> {
     pub fn new(buffer: &'a [u8], buffer_view: View, accessor: Accessor) -> Self {
         // determine stride
-        let stride = match buffer_view.stride() {
-            Some(stride) => stride,
-            None => 0,
-        };
+        let stride = buffer_view.stride().unwrap_or(0);
 
         Self::new_detail(
             buffer,
@@ -68,7 +65,7 @@ impl<'a, Element: Copy> AccessorIterator<'a, Element> {
             buffer,
             offset,
             stride,
-            count: count,
+            count,
             index: 0,
         }
     }
@@ -80,18 +77,20 @@ impl<'a, Element: Copy> AccessorIterator<'a, Element> {
 
         let ptr = &self.buffer[pos..(pos + size_of::<Element>())];
 
-        let mut result = unsafe { [MaybeUninit::<Element>::uninit().assume_init()] };
+        let mut result: Element = Default::default();
 
         unsafe {
-            std::slice::from_raw_parts_mut(result.as_mut_ptr().cast(), size_of::<Element>())
+            // get a mutable pointer to the result
+            let result_ptr = &mut result as *mut Element as *mut MaybeUninit<Element>;
+            std::slice::from_raw_parts_mut(result_ptr.cast(), size_of::<Element>())
                 .clone_from_slice(ptr);
         }
 
-        result[0]
+        result
     }
 }
 
-impl<'a, Element: Copy> Iterator for AccessorIterator<'a, Element> {
+impl<'a, Element: Copy + Default> Iterator for AccessorIterator<'a, Element> {
     type Item = Element;
 
     fn next(&mut self) -> Option<Self::Item> {

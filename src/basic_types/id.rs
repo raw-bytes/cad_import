@@ -16,9 +16,9 @@ impl IDCounter {
     }
 
     /// Generates and returns a new ID.
+    #[inline]
     pub fn gen(&self) -> ID {
-        let id = self.counter.fetch_add(1u64, Ordering::SeqCst);
-        id
+        self.counter.fetch_add(1u64, Ordering::SeqCst)
     }
 }
 

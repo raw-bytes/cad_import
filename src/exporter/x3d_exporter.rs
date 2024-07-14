@@ -58,8 +58,9 @@ impl<'a> X3DExporter<'a> {
                 .create_element("Scene")
                 .with_attribute(Attribute::from(("DEF", "scene")))
                 .write_inner_content::<_, XMLError>(|writer| {
-                    let root_node = tree.get_root_node_id().unwrap();
-                    self.write_node(writer, tree, root_node)?;
+                    if let Some(root_node_id) = tree.get_root_node_id() {
+                        Self::write_node(writer, tree, root_node_id)?;
+                    }
 
                     Ok(())
                 })?;
@@ -77,7 +78,6 @@ impl<'a> X3DExporter<'a> {
     }
 
     fn write_node<W: Write>(
-        &self,
         writer: &mut Writer<W>,
         tree: &Tree,
         node_id: NodeId,
@@ -109,7 +109,7 @@ impl<'a> X3DExporter<'a> {
 
             // process children of current node
             for child_id in node.get_children_node_ids().iter().cloned() {
-                self.write_node(writer, tree, child_id)?;
+                Self::write_node(writer, tree, child_id)?;
             }
 
             Ok(())

@@ -6,8 +6,7 @@ use cad_import::{
     ID,
 };
 
-///! This example loads the given file and dumps all infos about it to console
-
+/// This example loads the given file and dumps all infos about it to console
 fn usage() {
     println!("usage: file_info <file-path> [<mime-type>]\n");
     println!("file-path: The path to the cad file to parse.");
@@ -133,7 +132,7 @@ fn main() {
     let args = &args[1..];
 
     // check if the number of arguments is invalid
-    if args.len() == 0 {
+    if args.is_empty() {
         usage();
         std::process::exit(-1);
     } else if args.len() > 2 {

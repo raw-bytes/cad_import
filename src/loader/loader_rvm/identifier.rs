@@ -88,11 +88,8 @@ impl FromStr for Identifier {
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for c in self.chars {
-            match char::from_u32(c as u32) {
-                Some(x) => {
-                    write!(f, "{}", x)?;
-                }
-                None => {}
+            if let Some(x) = char::from_u32(c as u32) {
+                write!(f, "{}", x)?;
             }
         }
 

@@ -5,8 +5,7 @@ use cad_import::{
     loader::{FileResource, Manager},
 };
 
-///! This example loads the given file and exports as X3D to the specified path
-
+/// This example loads the given file and exports as X3D to the specified path
 fn usage() {
     println!("usage: to_x3d <file-path> <x3d-path> [<mime-type>]\n");
     println!("file-path: The path to the cad file to parse.");

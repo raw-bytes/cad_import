@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Assembly structure is now represented as arena tree based on node ids. This allows to reference nodes in the assembly structure by their id. However, this is a breaking change in the API!!!.
 
-## [0.3.1]
+## [0.3.1] - 2023-05-21
 
 ### Changed
 - Updated nalgebra-glm to recent version

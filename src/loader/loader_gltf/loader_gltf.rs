@@ -32,6 +32,12 @@ use super::{accessor_iterator::AccessorIterator, component::ComponentTrait, util
 /// Specification: See `<https://www.khronos.org/gltf/>`
 pub struct LoaderGLTF {}
 
+impl Default for LoaderGLTF {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LoaderGLTF {
     pub fn new() -> Self {
         Self {}
@@ -52,12 +58,9 @@ impl LoaderGLTF {
         let mut blobs = Vec::new();
 
         // check if there is an embedded buffer
-        match embedded_buffer {
-            Some(buffer) => {
-                blobs.push(buffer);
-                buffers.next();
-            }
-            _ => {}
+        if let Some(buffer) = embedded_buffer {
+            blobs.push(buffer);
+            buffers.next();
         }
 
         // check other buffers
@@ -78,9 +81,9 @@ impl LoaderGLTF {
                     blobs.push(blob);
                 }
                 Source::Bin => {
-                    return Err(Error::InvalidFormat(format!(
-                        "Only the first chunk can be binary"
-                    )));
+                    return Err(Error::InvalidFormat(
+                        "Only the first chunk can be binary".to_string(),
+                    ));
                 }
             }
         }
@@ -223,8 +226,9 @@ impl CADDataCreator {
 
         // check if we have 1 or more scenes or none at all which is an error
         match scene_root_node_ids.len() {
-            0 => Err(Error::InvalidFormat(format!("No scenes at all"))),
+            0 => Err(Error::InvalidFormat("No scenes at all".to_string())),
             1 => Ok(tree),
+
             _ => {
                 let root_node_id = tree.create_node("root".to_owned());
                 tree.set_root_node_id(root_node_id);
@@ -342,9 +346,11 @@ impl CADDataCreator {
             },
         };
 
-        let mut phong_data = PhongMaterialData::default();
-        phong_data.diffuse_color = diffuse_color;
-        phong_data.transparency = 1f32 - alpha_value;
+        let phong_data = PhongMaterialData {
+            diffuse_color,
+            transparency: 1f32 - alpha_value,
+            ..Default::default()
+        };
 
         Ok(Material::PhongMaterial(phong_data))
     }
@@ -356,8 +362,10 @@ impl CADDataCreator {
         match self.material_map.get(&default_material_index) {
             Some(m) => m.clone(),
             None => {
-                let mut phong_data: PhongMaterialData = Default::default();
-                phong_data.diffuse_color = RGB::black();
+                let phong_data = PhongMaterialData {
+                    diffuse_color: RGB::black(),
+                    ..Default::default()
+                };
                 let default_material = Rc::new(Material::PhongMaterial(phong_data));
 
                 self.material_map
@@ -383,15 +391,13 @@ impl CADDataCreator {
 
         // use index to lookup the material
         match self.material_map.get(&index) {
-            Some(m) => {
-                return m.clone();
-            }
+            Some(m) => m.clone(),
             None => {
                 warn!(
                     "Cannot find material with index {}. Take default material",
                     index
                 );
-                return self.get_default_material();
+                self.get_default_material()
             }
         }
     }
@@ -437,30 +443,28 @@ impl CADDataCreator {
             ) {
                 Some(accessor) => transmute_vec(Self::create_vec3_data(gltf_data, accessor)?),
                 None => {
-                    return Err(Error::InvalidFormat(format!(
-                        "Missing position attribute for the primitive data"
-                    )));
+                    return Err(Error::InvalidFormat(
+                        "Missing position attribute for the primitive data".to_string(),
+                    ));
                 }
             };
 
             let num_vertices = positions.len();
             let mut vertices = Vertices::from_positions(positions);
 
-            match Self::find_accessor_by_semantic(primitive.attributes(), Semantic::Normals) {
-                Some(accessor) => {
-                    let normals: Normals =
-                        transmute_vec(Self::create_vec3_data(gltf_data, accessor)?);
-                    if normals.len() != num_vertices {
-                        return Err(Error::InvalidFormat(format!(
-                            "Number of positions {} do not match number of normals {}",
-                            num_vertices,
-                            normals.len()
-                        )));
-                    }
-
-                    vertices.set_normals(normals)?;
+            if let Some(accessor) =
+                Self::find_accessor_by_semantic(primitive.attributes(), Semantic::Normals)
+            {
+                let normals: Normals = transmute_vec(Self::create_vec3_data(gltf_data, accessor)?);
+                if normals.len() != num_vertices {
+                    return Err(Error::InvalidFormat(format!(
+                        "Number of positions {} do not match number of normals {}",
+                        num_vertices,
+                        normals.len()
+                    )));
                 }
-                None => {}
+
+                vertices.set_normals(normals)?;
             }
 
             let mesh = Mesh::new(vertices, mesh_primitives)?;
@@ -477,10 +481,7 @@ impl CADDataCreator {
     /// * `semantic` - The semantic to search for.
     fn find_accessor_by_semantic(attributes: Attributes, semantic: Semantic) -> Option<Accessor> {
         let mut attributes = attributes;
-        match attributes.find(|(s, _a)| *s == semantic) {
-            Some((_, a)) => Some(a),
-            None => None,
-        }
+        attributes.find(|(s, _a)| *s == semantic).map(|(_, a)| a)
     }
 
     /// Creates the index data for the given GLTF mesh.
@@ -510,11 +511,9 @@ impl CADDataCreator {
                 }
 
                 match accessor.view() {
-                    None => {
-                        return Err(Error::InvalidFormat(format!(
-                            "Indices are missing corresponding buffer view"
-                        )));
-                    }
+                    None => Err(Error::InvalidFormat(
+                        "Indices are missing corresponding buffer view".to_string(),
+                    )),
                     Some(view) => {
                         let indices = match accessor.data_type() {
                             GLTFDataType::U8 => {
@@ -567,7 +566,7 @@ impl CADDataCreator {
         view: View,
     ) -> Result<Vec<u32>, Error>
     where
-        T: Sized + Copy + TryInto<u32> + Display,
+        T: Sized + Copy + TryInto<u32> + Display + Default,
     {
         let buffer_index = view.buffer().index();
         if buffer_index >= gltf_data.blobs.len() {
@@ -611,9 +610,9 @@ impl CADDataCreator {
         let view = match accessor.view() {
             Some(view) => view,
             None => {
-                return Err(Error::InvalidFormat(format!(
-                    "Missing buffer view reference"
-                )));
+                return Err(Error::InvalidFormat(
+                    "Missing buffer view reference".to_string(),
+                ));
             }
         };
 
@@ -641,7 +640,7 @@ impl CADDataCreator {
         view: View,
     ) -> Result<Vec<Vec3>, Error>
     where
-        T: Sized + Copy + Display,
+        T: Sized + Copy + Display + Default,
     {
         let normalize = accessor.normalized();
 
@@ -697,14 +696,14 @@ impl CADDataCreator {
     /// # Arguments
     /// * `data_type` - The datatype to check.
     fn is_data_type_integer(data_type: GLTFDataType) -> bool {
-        match data_type {
-            GLTFDataType::I8 => true,
-            GLTFDataType::U8 => true,
-            GLTFDataType::I16 => true,
-            GLTFDataType::U16 => true,
-            GLTFDataType::U32 => true,
-            _ => false,
-        }
+        matches!(
+            data_type,
+            GLTFDataType::I8
+                | GLTFDataType::U8
+                | GLTFDataType::I16
+                | GLTFDataType::U16
+                | GLTFDataType::U32
+        )
     }
 
     /// Tries to determine the number of vertices for the given attributes.
@@ -715,9 +714,9 @@ impl CADDataCreator {
         let mut attributes = attributes;
         match attributes.find(|(s, _)| *s == Semantic::Positions) {
             Some((_, a)) => Ok(a.count()),
-            None => Err(Error::InvalidFormat(format!(
-                "Primitive attributes have no position"
-            ))),
+            None => Err(Error::InvalidFormat(
+                "Primitive attributes have no position".to_string(),
+            )),
         }
     }
 }
@@ -794,6 +793,16 @@ mod tests {
         }
 
         total_area
+    }
+
+    #[test]
+    fn test_is_data_type_integer() {
+        assert!(CADDataCreator::is_data_type_integer(GLTFDataType::I8));
+        assert!(CADDataCreator::is_data_type_integer(GLTFDataType::U8));
+        assert!(CADDataCreator::is_data_type_integer(GLTFDataType::I16));
+        assert!(CADDataCreator::is_data_type_integer(GLTFDataType::U16));
+        assert!(CADDataCreator::is_data_type_integer(GLTFDataType::U32));
+        assert!(!CADDataCreator::is_data_type_integer(GLTFDataType::F32));
     }
 
     fn test_if_it_is_a_box(cad_data: &CADData) {

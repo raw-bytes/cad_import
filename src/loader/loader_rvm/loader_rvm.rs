@@ -14,6 +14,12 @@ use crate::{
 /// Loader for the AVEVA PDMS binary RVM format. (see https://en.wikipedia.org/wiki/PDMS_(software))
 pub struct LoaderRVM {}
 
+impl Default for LoaderRVM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LoaderRVM {
     pub fn new() -> Self {
         Self {}

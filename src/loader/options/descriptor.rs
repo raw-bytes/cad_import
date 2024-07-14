@@ -44,9 +44,9 @@ impl Descriptor {
     /// * `default_value` - The default value for the option.
     pub fn new(name: String, description: String, default_value: Value) -> Result<Self, Error> {
         if name.is_empty() {
-            return Err(Error::InvalidArgument(format!(
-                "Option name may not be empty"
-            )));
+            return Err(Error::InvalidArgument(
+                "Option name may not be empty".to_string(),
+            ));
         }
 
         Ok(Self {
@@ -70,9 +70,9 @@ impl Descriptor {
         validation_checker: ValidationChecker,
     ) -> Result<Self, Error> {
         if name.is_empty() {
-            return Err(Error::InvalidArgument(format!(
-                "Option name may not be empty"
-            )));
+            return Err(Error::InvalidArgument(
+                "Option name may not be empty".to_string(),
+            ));
         }
 
         Ok(Self {

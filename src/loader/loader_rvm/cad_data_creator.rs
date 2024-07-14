@@ -1,6 +1,6 @@
 use crate::structure::CADData;
 
-use super::rvm_parser::RVMInterpreter;
+use super::rvm_parser::{RVMHeader, RVMInterpreter, RVMModelHeader};
 
 /// The CAD creator creates the cad data structure based on the provided read events.
 pub struct CADDataCreator {}
@@ -16,4 +16,12 @@ impl CADDataCreator {
     }
 }
 
-impl RVMInterpreter for CADDataCreator {}
+impl RVMInterpreter for CADDataCreator {
+    fn header(&mut self, header: RVMHeader) {
+        println!("Header: {:?}", header);
+    }
+
+    fn model(&mut self, header: RVMModelHeader) {
+        println!("Model: {:?}", header);
+    }
+}

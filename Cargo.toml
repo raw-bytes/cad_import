@@ -22,7 +22,7 @@ log = "0.4"
 quick-xml = "0.36"
 itertools = "0.13"
 lazy_static = "1.5"
+byteorder = "1.5"
 
 [dev-dependencies]
 path-clean = "1.0"
-byteorder = "1.5"
