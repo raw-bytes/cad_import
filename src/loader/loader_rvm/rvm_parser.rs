@@ -189,11 +189,15 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
 
             trace!("Identifier: {}", id);
 
-            let size = self.read_u32()?;
-            debug!("Size: {}", size);
-
             if id == "CNTB" {
                 self.read_group()?;
+            } else if id == "PRIM" {
+                self.read_primitive()?;
+            } else {
+                return Err(Error::InvalidFormat(format!(
+                    "Unknown or invalid identifier {} found.",
+                    id
+                )));
             }
         }
 
@@ -212,14 +216,13 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
         let translation: Vec3 = Vec3::from_row_slice(&self.read_f32_array::<3>()?);
         trace!("Translation: {:?}", translation);
 
-        let material_id = self.read_f32()? as usize;
+        let material_id = self.read_u32()? as usize;
         trace!("Material ID: {}", material_id);
 
         self.interpreter
             .begin_group(group_name, translation, material_id);
 
         // read the children of the group
-        // Children
         loop {
             let id = self.read_until_valid_identifier()?;
             if id.is_empty() || id == "CNTE" {

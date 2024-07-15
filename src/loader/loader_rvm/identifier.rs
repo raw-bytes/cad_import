@@ -34,6 +34,10 @@ impl Identifier {
         false
     }
 
+    /// Reads an identifier from the given reader.
+    ///
+    /// # Errors
+    /// * `r` - The reader from which the identifier is read.
     pub fn read<R: Read>(r: &mut R) -> Result<Identifier, Error> {
         let mut buf = [0u8; 12];
         let mut chars = [0u8; 4];
