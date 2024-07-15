@@ -92,6 +92,10 @@ impl FromStr for Identifier {
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for c in self.chars {
+            if c == 0 {
+                break;
+            }
+
             if let Some(x) = char::from_u32(c as u32) {
                 write!(f, "{}", x)?;
             }
@@ -102,8 +106,13 @@ impl Display for Identifier {
 }
 
 impl PartialEq<&str> for Identifier {
+    #[inline]
     fn eq(&self, other: &&str) -> bool {
-        self.chars == other.as_bytes()
+        if self.chars[3] == 0 {
+            &self.chars[..3] == other.as_bytes()
+        } else {
+            self.chars == other.as_bytes()
+        }
     }
 }
 

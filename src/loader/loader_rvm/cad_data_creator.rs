@@ -27,6 +27,10 @@ impl RVMInterpreter for CADDataCreator {
         println!("Model: {:?}", header);
     }
 
+    fn primitive(&mut self, primitive: super::primitive::Primitive, matrix: [f32; 12]) {
+        println!("Primitive: {:?}, {:?}", primitive, matrix);
+    }
+
     fn begin_group(&mut self, group_name: String, translation: Vec3, material_id: usize) {
         println!(
             "Group: {:?}, {:?}, {:?}",

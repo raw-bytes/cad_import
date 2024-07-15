@@ -7,7 +7,7 @@ use itertools::Itertools;
 use log::{debug, trace};
 use nalgebra_glm::Vec3;
 
-use super::{identifier::Identifier, identifier_reader::IdentifierReader};
+use super::{identifier::Identifier, identifier_reader::IdentifierReader, primitive::Primitive};
 
 /// The RVM interpreter gets all the callbacks to process
 pub trait RVMInterpreter {
@@ -22,6 +22,13 @@ pub trait RVMInterpreter {
     /// # Arguments
     /// * `header` - The model header of the RVM file.
     fn model(&mut self, header: RVMModelHeader);
+
+    /// Called when a new primitive has been read.
+    ///
+    /// # Arguments
+    /// * `primitive` - The data of the read primitive.
+    /// * `matrix` - The transformation matrix of the primitive.
+    fn primitive(&mut self, primitive: Primitive, matrix: [f32; 12]);
 
     /// Called when a new group is being read.
     ///
@@ -262,7 +269,10 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
         // skip the bounding box
         self.skip_bytes(6)?;
 
-        unimplemented!()
+        let primitive = Primitive::from_reader(&mut self.reader, primitive_type)?;
+        self.interpreter.primitive(primitive, matrix);
+
+        Ok(())
     }
 
     /// Reads an array of 32-bit floating point numbers.

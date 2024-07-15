@@ -15,6 +15,12 @@
         "PDMS",
         "Phong",
         "Uninit",
-        "vecs"
+        "vecs",
+        "xbottom",
+        "xoffset",
+        "xtop",
+        "ybottom",
+        "yoffset",
+        "ytop"
     ]
 }
