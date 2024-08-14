@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::Error;
+use crate::{Error, Length};
 
 use super::{Descriptor, OptionsDescriptor, OptionsGroup, Value};
 
@@ -22,9 +22,7 @@ lazy_static! {
                         Ok(())
                     }
                 }
-                _ => Err(format!(
-                    "Invalid value. Value must be a non-negative integer number"
-                )),
+                _ => Err("Invalid value. Value must be a non-negative integer number".to_string()),
             },
         )
         .unwrap()];
@@ -42,6 +40,9 @@ pub struct GeneralOptions {
     ///
     /// Default: 0
     resolving_link_depth: u32,
+
+    /// The maximum deviation of the tessellated surface from the original surface.
+    tessellation_max_chordal_distance: Length,
 }
 
 impl GeneralOptions {
@@ -55,6 +56,11 @@ impl GeneralOptions {
         self.resolving_link_depth
     }
 
+    /// Returns the maximum deviation of the tessellated surface from the original surface.
+    pub fn get_tessellation_max_chordal_distance(&self) -> Length {
+        self.tessellation_max_chordal_distance
+    }
+
     /// Returns a descriptor for the general options.
     pub fn get_descriptor() -> OptionsDescriptor {
         GENERAL_OPTIONS_DESCRIPTOR.clone()
@@ -66,9 +72,9 @@ impl GeneralOptions {
     /// * `values` - Values used for setting the general options.
     pub fn set_values(&mut self, values: OptionsGroup) -> Result<(), Error> {
         if values.get_descriptor().get_id() != GENERAL_OPTIONS_DESCRIPTOR.get_id() {
-            Err(Error::InvalidArgument(format!(
-                "Provided options do not match with general options"
-            )))
+            Err(Error::InvalidArgument(
+                "Provided options do not match with general options".to_string(),
+            ))
         } else {
             self.resolving_link_depth = values
                 .get_value("link_depth")
@@ -85,6 +91,7 @@ impl Default for GeneralOptions {
     fn default() -> Self {
         Self {
             resolving_link_depth: 0,
+            tessellation_max_chordal_distance: Length::new(0.001),
         }
     }
 }

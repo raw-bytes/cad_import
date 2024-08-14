@@ -1,4 +1,5 @@
-use super::{tree::Tree, Length};
+use super::tree::Tree;
+use crate::Length;
 
 /// The central in-memory data-structure for loaded CAD data.
 pub struct CADData {

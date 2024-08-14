@@ -3,10 +3,8 @@ mod cad_data;
 mod metadata;
 mod shape;
 mod tree;
-mod units;
 
 pub use cad_data::CADData;
 pub use metadata::*;
 pub use shape::*;
 pub use tree::{Node, NodeId, Tree};
-pub use units::*;

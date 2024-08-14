@@ -4,6 +4,7 @@ mod identifier_reader;
 mod loader_rvm;
 mod primitive;
 mod rvm_parser;
+mod tessellate;
 mod test_rvm;
 
 pub use loader_rvm::LoaderRVM;
