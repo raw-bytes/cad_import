@@ -1,6 +1,6 @@
 use lazy_static::lazy_static;
 
-use crate::{Error, Length};
+use crate::{Angle, Error, Length};
 
 use super::{Descriptor, OptionsDescriptor, OptionsGroup, Value};
 
@@ -39,16 +39,27 @@ pub struct GeneralOptions {
     /// ... etc.
     ///
     /// Default: 0
-    resolving_link_depth: u32,
+    pub resolving_link_depth: u32,
 
-    /// The maximum deviation of the tessellated surface from the original surface.
-    tessellation_max_chordal_distance: Length,
+    /// The maximum deviation of the tessellated surface from the parametrically defined surface.
+    pub max_sag: Length,
+
+    /// The maximum length of a single edge in the tessellated surface.
+    pub max_length: Option<Length>,
+
+    /// The maximum angle between two adjacent edges in the tessellated surface in radians.
+    pub max_angle: Option<Angle>,
 }
 
 impl GeneralOptions {
     /// Returns a new general option object with default values.
     pub fn new() -> Self {
-        Default::default()
+        Self {
+            resolving_link_depth: 0,
+            max_sag: Length::new(0.001),
+            max_length: None,
+            max_angle: None,
+        }
     }
 
     /// Returns the depth until which links are resolved.
@@ -57,8 +68,18 @@ impl GeneralOptions {
     }
 
     /// Returns the maximum deviation of the tessellated surface from the original surface.
-    pub fn get_tessellation_max_chordal_distance(&self) -> Length {
-        self.tessellation_max_chordal_distance
+    pub fn get_max_sag(&self) -> Length {
+        self.max_sag
+    }
+
+    /// Returns the maximum length of a single edge in the tessellated surface.
+    pub fn get_max_length(&self) -> Option<Length> {
+        self.max_length
+    }
+
+    /// Returns the maximum angle between two adjacent edges in the tessellated surface.
+    pub fn get_max_angle(&self) -> Option<Angle> {
+        self.max_angle
     }
 
     /// Returns a descriptor for the general options.
@@ -89,10 +110,7 @@ impl GeneralOptions {
 
 impl Default for GeneralOptions {
     fn default() -> Self {
-        Self {
-            resolving_link_depth: 0,
-            tessellation_max_chordal_distance: Length::new(0.001),
-        }
+        Self::new()
     }
 }
 

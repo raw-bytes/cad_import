@@ -73,6 +73,40 @@ impl ops::Div<f64> for Length {
     }
 }
 
+/// A unit for angle, i.e., the unit could be in radians or degrees
+#[derive(Clone, Copy, PartialEq)]
+pub struct Angle {
+    /// The length unit expressed in meters
+    in_radians: f64,
+}
+
+impl Angle {
+    /// Returns a new unit based on the provided angle in radians.
+    ///
+    /// # Arguments
+    /// * `in_radians` - The new unit defined in radians.
+    pub fn new(in_radians: f64) -> Self {
+        Self { in_radians }
+    }
+
+    /// Returns the unit in radians.
+    #[inline]
+    pub fn get_unit_in_radians(&self) -> f64 {
+        self.in_radians
+    }
+
+    /// Returns the unit in degrees.
+    #[inline]
+    pub fn get_unit_in_degrees(&self) -> f64 {
+        self.in_radians.to_degrees()
+    }
+
+    /// Returns the unit in gradians.
+    pub fn get_unit_in_gradians(&self) -> f64 {
+        self.in_radians.to_degrees() * 10f64 / 9f64
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -90,5 +124,13 @@ mod tests {
                 <= 1e-4f64
         );
         assert_eq!(Length::FEET * 5280f64, Length::MILE);
+    }
+
+    #[test]
+    fn test_angle_units() {
+        let angle = Angle::new(std::f64::consts::PI);
+        assert_eq!(angle.get_unit_in_radians(), std::f64::consts::PI);
+        assert_eq!(angle.get_unit_in_degrees(), 180f64);
+        assert_eq!(angle.get_unit_in_gradians(), 200f64);
     }
 }
