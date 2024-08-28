@@ -50,11 +50,11 @@ impl<'a> X3DExporter<'a> {
         let mut writer = writer;
 
         let x3d = writer.create_element("X3D");
-        x3d.write_inner_content(|writer| {
+        x3d.write_inner_content::<_, XMLError>(|writer| {
             writer
                 .create_element("Scene")
                 .with_attribute(Attribute::from(("DEF", "scene")))
-                .write_inner_content(|writer| {
+                .write_inner_content::<_, XMLError>(|writer| {
                     let root_node = self.cad_data.get_root_node();
                     self.write_node(writer, root_node)?;
 
@@ -87,7 +87,7 @@ impl<'a> X3DExporter<'a> {
             .create_element("MatrixTransform")
             .with_attribute(Attribute::from(("matrix", matrix_string.as_str())));
 
-        group.write_inner_content(|writer| {
+        group.write_inner_content::<_, XMLError>(|writer| {
             Self::write_label(writer, node.get_label())?;
 
             // add shape information to the current node if available
@@ -117,7 +117,7 @@ impl<'a> X3DExporter<'a> {
         let metadata_set = writer.create_element("MetadataSet");
         metadata_set
             .with_attribute(Attribute::from(("containerField", "metadata")))
-            .write_inner_content(|writer| {
+            .write_inner_content::<_, XMLError>(|writer| {
                 writer
                     .create_element("MetadataString")
                     .with_attribute(Attribute::from(("containerField", "value")))
@@ -139,7 +139,7 @@ impl<'a> X3DExporter<'a> {
     fn write_part<W: Write>(writer: &mut Writer<W>, part: &ShapePart) -> Result<(), XMLError> {
         let shape = writer.create_element("Shape");
 
-        shape.write_inner_content(|writer| {
+        shape.write_inner_content::<_, XMLError>(|writer| {
             // write material
             match part.get_material().as_ref() {
                 Material::PhongMaterial(phong_data) => {
@@ -148,7 +148,7 @@ impl<'a> X3DExporter<'a> {
 
                     writer
                         .create_element("Appearance")
-                        .write_inner_content(|writer| {
+                        .write_inner_content::<_, XMLError>(|writer| {
                             let xml_mat = writer.create_element("Material");
                             xml_mat
                                 .with_attribute(Attribute::from((
