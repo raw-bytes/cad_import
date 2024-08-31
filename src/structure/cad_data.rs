@@ -1,9 +1,9 @@
-use super::{Length, Node};
+use super::{tree::Tree, Length};
 
 /// The central in-memory data-structure for loaded CAD data.
 pub struct CADData {
-    /// The root node of the assembly structure of the cad data.
-    root_node: Node,
+    /// The assembly structure of the cad data.
+    tree: Tree,
 
     /// The length unit in which all spacial coordinates are defined
     length_unit: Length,
@@ -13,17 +13,17 @@ impl CADData {
     /// Creates and returns a new CAD data object.
     ///
     /// # Arguments
-    /// * `root_node` - The root node of the assembly structure.
-    pub fn new(root_node: Node) -> Self {
+    /// * `tree` - The assembly structure of the cad data.
+    pub fn new(tree: Tree) -> Self {
         Self {
-            root_node,
+            tree,
             length_unit: Length::METER,
         }
     }
 
-    /// Returns a reference onto the root node of the assembly structure.
-    pub fn get_root_node(&self) -> &Node {
-        &self.root_node
+    /// Returns a reference onto the assembly structure of the cad data.
+    pub fn get_assembly(&self) -> &Tree {
+        &self.tree
     }
 
     /// Returns the unit for lengths.
@@ -42,12 +42,16 @@ impl CADData {
 
 #[cfg(test)]
 mod tests {
+    use crate::structure::tree::Tree;
+
     use super::*;
 
     #[test]
     fn test_cad_data_unit() {
-        let root_node = Node::new("Root".to_owned());
-        let mut cad_data = CADData::new(root_node);
+        let mut tree = Tree::new();
+        tree.create_node("Root".to_owned());
+
+        let mut cad_data = CADData::new(tree);
 
         assert_eq!(cad_data.get_length_unit(), Length::METER);
 

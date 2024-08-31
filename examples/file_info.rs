@@ -2,7 +2,7 @@ use std::{collections::HashSet, env, path::Path};
 
 use cad_import::{
     loader::{FileResource, Manager},
-    structure::{CADData, Node},
+    structure::{CADData, NodeId, Tree},
     ID,
 };
 
@@ -17,7 +17,11 @@ fn usage() {
     );
 }
 
-fn determine_mime_types(manager: &Manager, input_file: &Path, mime_type: Option<&str>) -> Vec<String> {
+fn determine_mime_types(
+    manager: &Manager,
+    input_file: &Path,
+    mime_type: Option<&str>,
+) -> Vec<String> {
     match mime_type {
         Some(m) => vec![m.to_owned()],
         None => match input_file.extension() {
@@ -43,7 +47,9 @@ struct VisitorContext {
     pub shapes: HashSet<ID>,
 }
 
-fn visit_node(node: &Node, ctx: &mut VisitorContext) {
+fn visit_node(tree: &Tree, node_id: NodeId, ctx: &mut VisitorContext) {
+    let node = tree.get_node(node_id).unwrap();
+
     ctx.num_nodes += 1;
 
     for shape in node.get_shapes().iter() {
@@ -61,8 +67,8 @@ fn visit_node(node: &Node, ctx: &mut VisitorContext) {
         }
     }
 
-    for child in node.get_children().iter() {
-        visit_node(child, ctx);
+    for child_id in node.get_children_node_ids().iter().cloned() {
+        visit_node(tree, child_id, ctx);
     }
 }
 
@@ -73,7 +79,10 @@ fn dump_info(cad_data: &CADData) {
         num_primitives: 0,
         shapes: HashSet::new(),
     };
-    visit_node(cad_data.get_root_node(), &mut ctx);
+
+    let tree = cad_data.get_assembly();
+    let root_node_id = tree.get_root_node_id().unwrap();
+    visit_node(tree, root_node_id, &mut ctx);
 
     println!("Statistics:");
     println!("Num Vertices: {}", ctx.num_vertices);

@@ -8,5 +8,5 @@ mod units;
 pub use cad_data::CADData;
 pub use metadata::*;
 pub use shape::*;
-pub use tree::Node;
+pub use tree::{Node, NodeId, Tree};
 pub use units::*;

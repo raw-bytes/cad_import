@@ -11,8 +11,8 @@ use crate::{
     basic_types::RGBA,
     error::Error,
     structure::{
-        CADData, Colors, IndexData, Mesh, Node, Point3D, Positions, PrimitiveType, Primitives,
-        Shape, ShapePart, Vertices,
+        CADData, Colors, IndexData, Mesh, Point3D, Positions, PrimitiveType, Primitives, Shape,
+        ShapePart, Tree, Vertices,
     },
 };
 
@@ -234,11 +234,14 @@ impl LoaderOff {
         shape.add_part(part);
 
         // create root node and attach shape to it
-        let mut root_node = Node::new("root".to_owned());
-        root_node.attach_shape(Rc::new(shape));
+        let mut tree = Tree::new();
+        tree.create_node("root".to_owned());
+        tree.get_root_node_mut()
+            .unwrap()
+            .attach_shape(Rc::new(shape));
 
         // finally, create the cad data
-        let cad_data = CADData::new(root_node);
+        let cad_data = CADData::new(tree);
 
         Ok(cad_data)
     }
@@ -352,7 +355,9 @@ mod tests {
         let loader = LoaderOff::new();
 
         let cad_data = loader.read(&r).unwrap();
-        let root_node = cad_data.get_root_node();
+        let assembly = cad_data.get_assembly();
+        let root_node = assembly.get_root_node().unwrap();
+
         assert!(root_node.is_leaf());
 
         let shapes = root_node.get_shapes();

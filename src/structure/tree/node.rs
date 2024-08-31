@@ -7,20 +7,20 @@ use std::{
 use nalgebra_glm::Mat4;
 
 use crate::{
-    basic_types::{IDCounter, ID},
     structure::{MetaDataNode, Shape},
+    ID,
 };
 
-static ID_COUNTER: IDCounter = IDCounter::new();
+use super::NodeId;
 
 /// A single node in the assembly structure of the CAD data.
 pub struct Node {
-    id: u64,
+    id: NodeId,
     label: String,
     metadata: Option<Arc<MetaDataNode>>,
     transform: Option<Mat4>,
     shapes: Vec<Rc<Shape>>,
-    children: Vec<Node>,
+    children: Vec<NodeId>,
 }
 
 impl Node {
@@ -28,9 +28,7 @@ impl Node {
     ///
     /// # Arguments
     /// * `label` - The label of the node.
-    pub fn new(label: String) -> Self {
-        let id = ID_COUNTER.gen();
-
+    pub fn new(label: String, id: NodeId) -> Self {
         Self {
             id,
             label,
@@ -42,7 +40,7 @@ impl Node {
     }
 
     /// Returns the id of the node
-    pub fn get_id(&self) -> u64 {
+    pub fn get_id(&self) -> NodeId {
         self.id
     }
 
@@ -72,13 +70,13 @@ impl Node {
     /// Adds the given node as child.
     ///
     /// # Arguments
-    /// * `child` - The node to add as child.
-    pub fn add_child(&mut self, child: Node) {
+    /// * `child` - The node id to add as child.
+    pub fn add_child(&mut self, child: NodeId) {
         self.children.push(child);
     }
 
     /// Returns a reference onto the children of this node
-    pub fn get_children(&self) -> &[Node] {
+    pub fn get_children_node_ids(&self) -> &[NodeId] {
         &self.children
     }
 
@@ -124,13 +122,12 @@ impl Display for Node {
 
 impl Debug for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let children_ids: Vec<ID> = self.children.iter().map(|c| c.get_id()).collect();
         let shape_ids: Vec<ID> = self.shapes.iter().map(|s| s.get_id()).collect();
 
         write!(
             f,
             "Node({})[label={}, #Children={:?}, #Shapes={:?}]",
-            self.id, self.label, children_ids, shape_ids
+            self.id, self.label, self.children, shape_ids
         )
     }
 }
@@ -145,27 +142,26 @@ impl Eq for Node {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::structure::tree::Tree;
 
     #[test]
     fn test_node_basic() {
-        let mut node0 = Node::new("node".to_owned());
-        let node1 = Node::new("node".to_owned());
+        let mut tree = Tree::new();
 
-        let node_id1 = node1.get_id();
+        let node_id0 = tree.create_node("node".to_owned());
+        let node_id1: usize = tree.create_node("node".to_owned());
 
-        assert!(node0.is_leaf());
-        assert!(node1.is_leaf());
+        assert!(tree.get_node(node_id0).unwrap().is_leaf());
+        assert!(tree.get_node(node_id1).unwrap().is_leaf());
 
-        assert_eq!(node0, node0);
-        assert_eq!(node1, node1);
-        assert_ne!(node0, node1);
+        assert_ne!(node_id0, node_id1);
 
-        node0.add_child(node1);
+        tree.get_node_mut(node_id0).unwrap().add_child(node_id1);
 
+        let node0 = tree.get_node(node_id0).unwrap();
         assert!(!node0.is_leaf());
-        assert_eq!(node0.get_children().len(), 1);
-        let node1 = &node0.get_children()[0];
+        assert_eq!(node0.get_children_node_ids().len(), 1);
+        let node1 = tree.get_node(node0.get_children_node_ids()[0]).unwrap();
         assert_eq!(node1.get_id(), node_id1);
     }
 }
