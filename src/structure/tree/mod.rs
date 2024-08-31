@@ -58,6 +58,21 @@ impl Tree {
         new_node_id
     }
 
+    /// Creates a new node with the given label and adds it to the tree as a child of the node with
+    /// the given parent id.
+    ///
+    /// # Arguments
+    /// * `label` - The label of the node.
+    /// * `parent_id` - The id of the parent node.
+    pub fn create_node_with_parent(&mut self, label: String, parent_id: NodeId) -> NodeId {
+        let new_node_id = self.create_node(label);
+
+        let parent_node = self.get_node_mut(parent_id).unwrap();
+        parent_node.add_child(new_node_id);
+
+        new_node_id
+    }
+
     /// Returns a reference to the root node.
     pub fn get_root_node(&self) -> Option<&Node> {
         let node = self.node_pool.first();
@@ -86,5 +101,41 @@ impl Tree {
 impl Default for Tree {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Very simple test to create a tree with a root node and two children and traverse it.
+    #[test]
+    fn test_creating_and_traversing_tree1() {
+        let mut tree = Tree::new();
+
+        let root_node_id = tree.create_node("root".to_string());
+
+        let child1_id = tree.create_node_with_parent("child1".to_string(), root_node_id);
+        let child2_id = tree.create_node_with_parent("child2".to_string(), root_node_id);
+
+        assert_eq!(tree.get_root_node_id(), Some(root_node_id));
+
+        let root_node = tree.get_root_node().unwrap();
+        assert_eq!(root_node.get_label(), "root");
+        let mut children_ids = Vec::from_iter(root_node.get_children_node_ids().iter().cloned());
+        children_ids.sort();
+
+        assert_eq!(
+            children_ids.as_slice(),
+            &[child1_id.min(child2_id), child2_id.max(child1_id)]
+        );
+
+        let child1 = tree.get_node(child1_id).unwrap();
+        assert_eq!(child1.get_label(), "child1");
+        assert!(child1.is_leaf());
+
+        let child2 = tree.get_node(child2_id).unwrap();
+        assert_eq!(child2.get_label(), "child2");
+        assert!(child2.is_leaf());
     }
 }
