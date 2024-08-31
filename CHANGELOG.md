@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for length units (see https://github.com/raw-bytes/cad_import/issues/13)
 - Added new metadata concept (see https://github.com/raw-bytes/cad_import/issues/11)
 
+### Changed
+- Assembly structure is now represented as arena tree based on node ids. This allows to reference nodes in the assembly structure by their id. However, this is a breaking change in the API!!!.
+
 ## [0.3.1]
 
 ### Changed
