@@ -7,7 +7,9 @@ use nalgebra_glm::{Mat4, Vec3};
 use quick_xml::{events::attributes::Attribute, writer::Writer, Error as XMLError};
 
 use crate::{
-    structure::{CADData, IndexData, Material, Mesh, Node, PrimitiveType, ShapePart, Vertices},
+    structure::{
+        CADData, IndexData, Material, Mesh, NodeId, PrimitiveType, ShapePart, Tree, Vertices,
+    },
     Error,
 };
 
@@ -48,6 +50,7 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The XML serialize writer.
     fn write_xml<W: Write>(&self, writer: Writer<W>) -> Result<(), XMLError> {
         let mut writer = writer;
+        let tree = self.cad_data.get_assembly();
 
         let x3d = writer.create_element("X3D");
         x3d.write_inner_content::<_, XMLError>(|writer| {
@@ -55,8 +58,8 @@ impl<'a> X3DExporter<'a> {
                 .create_element("Scene")
                 .with_attribute(Attribute::from(("DEF", "scene")))
                 .write_inner_content::<_, XMLError>(|writer| {
-                    let root_node = self.cad_data.get_root_node();
-                    self.write_node(writer, root_node)?;
+                    let root_node = tree.get_root_node_id().unwrap();
+                    self.write_node(writer, tree, root_node)?;
 
                     Ok(())
                 })?;
@@ -73,7 +76,14 @@ impl<'a> X3DExporter<'a> {
         Ok(())
     }
 
-    fn write_node<W: Write>(&self, writer: &mut Writer<W>, node: &Node) -> Result<(), XMLError> {
+    fn write_node<W: Write>(
+        &self,
+        writer: &mut Writer<W>,
+        tree: &Tree,
+        node_id: NodeId,
+    ) -> Result<(), XMLError> {
+        let node = tree.get_node(node_id).unwrap();
+
         // create the serialized string for the transformation matrix
         let m = node.get_transform().unwrap_or(Mat4::identity());
         let matrix_string: String = Itertools::intersperse(
@@ -98,8 +108,8 @@ impl<'a> X3DExporter<'a> {
             }
 
             // process children of current node
-            for child in node.get_children() {
-                self.write_node(writer, child)?;
+            for child_id in node.get_children_node_ids().iter().cloned() {
+                self.write_node(writer, tree, child_id)?;
             }
 
             Ok(())

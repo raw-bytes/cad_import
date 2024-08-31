@@ -20,8 +20,8 @@ use nalgebra_glm::{Mat4, Vec3};
 use crate::{
     loader::{Loader, OptionsDescriptor, Resource},
     structure::{
-        CADData, IndexData, Material, Mesh, Node, Normals, PhongMaterialData, Positions,
-        PrimitiveType, Primitives, Shape, ShapePart, Vertices,
+        CADData, IndexData, Material, Mesh, NodeId, Normals, PhongMaterialData, Positions,
+        PrimitiveType, Primitives, Shape, ShapePart, Tree, Vertices,
     },
     Color, Error, RGB,
 };
@@ -189,45 +189,52 @@ impl CADDataCreator {
 
         creator.create_materials(gltf_data)?;
         creator.create_shapes(gltf_data)?;
-        let root_node = creator.create_nodes(gltf_data)?;
+        let tree = creator.create_assembly_structure(gltf_data)?;
 
-        Ok(CADData::new(root_node))
+        Ok(CADData::new(tree))
     }
 
-    /// Creates a tree from all GLTF scenes and data.
+    /// Creates the assembly structure from all GLTF scenes and data.
     ///
     /// # Arguments
     /// * `gltf_data` - The GLTF data which is used for parsing and creating the tree.
-    fn create_nodes(&self, gltf_data: &GLTFData) -> Result<Node, Error> {
+    fn create_assembly_structure(&self, gltf_data: &GLTFData) -> Result<Tree, Error> {
+        let mut tree = Tree::new();
+
         // iterate over the list of GLTF scenes and create a node for each scene
         let scenes = gltf_data.document.scenes();
-        let mut root_nodes: Vec<Node> = Vec::with_capacity(scenes.len());
+        let mut scene_root_node_ids: Vec<NodeId> = Vec::with_capacity(scenes.len());
         for scene in scenes {
             let label = match scene.name() {
                 Some(s) => s.to_owned(),
-                None => "".to_owned(),
+                None => String::new(),
             };
 
-            let mut scene_root_node = Node::new(label);
+            let scene_root_node_id = tree.create_node(label);
 
             for node in scene.nodes() {
-                scene_root_node.add_child(self.process_node(gltf_data, node)?);
+                let child_id = self.process_node(&mut tree, gltf_data, node)?;
+                let scene_root_node = tree.get_node_mut(scene_root_node_id).unwrap();
+                scene_root_node.add_child(child_id);
             }
 
-            root_nodes.push(scene_root_node);
+            scene_root_node_ids.push(scene_root_node_id);
         }
 
         // check if we have 1 or more scenes or none at all which is an error
-        match root_nodes.len() {
+        match scene_root_node_ids.len() {
             0 => Err(Error::InvalidFormat(format!("No scenes at all"))),
-            1 => Ok(root_nodes.pop().unwrap()),
+            1 => Ok(tree),
             _ => {
-                let mut root_node = Node::new("root".to_owned());
-                for n in root_nodes {
+                let root_node_id = tree.create_node("root".to_owned());
+                tree.set_root_node_id(root_node_id);
+
+                let root_node = tree.get_node_mut(root_node_id).unwrap();
+                for n in scene_root_node_ids {
                     root_node.add_child(n);
                 }
 
-                Ok(root_node)
+                Ok(tree)
             }
         }
     }
@@ -235,46 +242,56 @@ impl CADDataCreator {
     /// Create a tree from the given node.
     ///
     /// # Arguments
+    /// * `tree` - The tree to which the node will be added.
     /// * `gltf_data` - The GLTF data which is used for parsing and creating the tree.
     /// * `in_node` - The gltf node which defines the subtree.
-    fn process_node(&self, gltf_data: &GLTFData, in_node: GLTFNode) -> Result<Node, Error> {
+    fn process_node(
+        &self,
+        tree: &mut Tree,
+        gltf_data: &GLTFData,
+        in_node: GLTFNode,
+    ) -> Result<NodeId, Error> {
         let label = match in_node.name() {
             Some(s) => s.to_owned(),
             None => "".to_owned(),
         };
 
-        let mut out_node = Node::new(label);
+        let out_node_id = tree.create_node(label);
 
-        // set the matrix for the node
-        let m = Self::transform_to_matrix(in_node.transform());
-        out_node.set_transform(m);
+        {
+            let out_node = tree.get_node_mut(out_node_id).unwrap();
 
-        // attach shapes to the node
-        match in_node.mesh() {
-            Some(mesh) => {
-                let mesh_index = mesh.index();
-                match self.shape_map.get(&mesh_index) {
-                    Some(shape) => {
-                        out_node.attach_shape(shape.clone());
-                    }
-                    None => {
-                        return Err(Error::InvalidFormat(format!(
-                            "Could not find mesh with index {}",
-                            mesh_index
-                        )));
+            // set the matrix for the node
+            let m = Self::transform_to_matrix(in_node.transform());
+            out_node.set_transform(m);
+
+            // attach shapes to the node
+            match in_node.mesh() {
+                Some(mesh) => {
+                    let mesh_index = mesh.index();
+                    match self.shape_map.get(&mesh_index) {
+                        Some(shape) => {
+                            out_node.attach_shape(shape.clone());
+                        }
+                        None => {
+                            return Err(Error::InvalidFormat(format!(
+                                "Could not find mesh with index {}",
+                                mesh_index
+                            )));
+                        }
                     }
                 }
+                None => {}
             }
-            None => {}
         }
 
         // iterate over the children
         for in_child in in_node.children() {
-            let out_child = self.process_node(gltf_data, in_child)?;
-            out_node.add_child(out_child);
+            let out_child = self.process_node(tree, gltf_data, in_child)?;
+            tree.get_node_mut(out_node_id).unwrap().add_child(out_child);
         }
 
-        Ok(out_node)
+        Ok(out_node_id)
     }
 
     /// Returns a matrix 4 from the given GLTF transformation.
@@ -715,18 +732,21 @@ mod tests {
 
     use super::*;
 
-    /// Helper function to find any shape by traversing through the nodes.
+    /// Recursive helper function to find any shape by traversing through the nodes.
     /// Will stop as soon as it encounters the first shape.
     ///
     /// # Arguments
+    /// * `tree` - The tree to traverse.
     /// * `node` - The node and its children to check.
-    fn find_shape(node: &Node) -> Option<Rc<Shape>> {
+    fn find_shape(tree: &Tree, node_id: NodeId) -> Option<Rc<Shape>> {
+        let node = tree.get_node(node_id).unwrap();
+
         if !node.get_shapes().is_empty() {
             return Some(node.get_shapes()[0].clone());
         }
 
-        for child in node.get_children() {
-            match find_shape(child) {
+        for child_node_id in node.get_children_node_ids().iter().cloned() {
+            match find_shape(tree, child_node_id) {
                 Some(shape) => return Some(shape),
                 None => {}
             }
@@ -777,7 +797,8 @@ mod tests {
     }
 
     fn test_if_it_is_a_box(cad_data: &CADData) {
-        let shape = find_shape(cad_data.get_root_node()).unwrap();
+        let tree = cad_data.get_assembly();
+        let shape = find_shape(tree, tree.get_root_node_id().unwrap()).unwrap();
         assert_eq!(shape.get_parts().len(), 1);
         let part = &shape.get_parts()[0];
         let mesh = part.get_mesh();
