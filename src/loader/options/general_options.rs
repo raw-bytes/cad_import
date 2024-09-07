@@ -31,16 +31,9 @@ lazy_static! {
     };
 }
 
-/// General options that apply to all loaders
-#[derive(Clone)]
-pub struct GeneralOptions {
-    /// Determines the depth of following links to resolve them.
-    /// 0 means, never resolve any links, and 1 means only resolve the first stage of 0 links,
-    /// ... etc.
-    ///
-    /// Default: 0
-    pub resolving_link_depth: u32,
-
+/// Options for tessellation
+#[derive(Clone, Debug)]
+pub struct TessellationOptions {
     /// The maximum deviation of the tessellated surface from the parametrically defined surface.
     pub max_sag: Length,
 
@@ -51,35 +44,42 @@ pub struct GeneralOptions {
     pub max_angle: Option<Angle>,
 }
 
+impl Default for TessellationOptions {
+    fn default() -> Self {
+        Self {
+            max_sag: Length::new(0.001),
+            max_length: None,
+            max_angle: None,
+        }
+    }
+}
+
+/// General options that apply to all loaders
+#[derive(Clone)]
+pub struct GeneralOptions {
+    /// Determines the depth of following links to resolve them.
+    /// 0 means, never resolve any links, and 1 means only resolve the first stage of 0 links,
+    /// ... etc.
+    ///
+    /// Default: 0
+    pub resolving_link_depth: u32,
+
+    /// The parameter for tessellating geometry.
+    pub tessellation_options: TessellationOptions,
+}
+
 impl GeneralOptions {
     /// Returns a new general option object with default values.
     pub fn new() -> Self {
         Self {
             resolving_link_depth: 0,
-            max_sag: Length::new(0.001),
-            max_length: None,
-            max_angle: None,
+            tessellation_options: TessellationOptions::default(),
         }
     }
 
     /// Returns the depth until which links are resolved.
     pub fn get_resolving_link_depth(&self) -> u32 {
         self.resolving_link_depth
-    }
-
-    /// Returns the maximum deviation of the tessellated surface from the original surface.
-    pub fn get_max_sag(&self) -> Length {
-        self.max_sag
-    }
-
-    /// Returns the maximum length of a single edge in the tessellated surface.
-    pub fn get_max_length(&self) -> Option<Length> {
-        self.max_length
-    }
-
-    /// Returns the maximum angle between two adjacent edges in the tessellated surface.
-    pub fn get_max_angle(&self) -> Option<Angle> {
-        self.max_angle
     }
 
     /// Returns a descriptor for the general options.

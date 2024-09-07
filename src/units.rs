@@ -74,7 +74,7 @@ impl ops::Div<f64> for Length {
 }
 
 /// A unit for angle, i.e., the unit could be in radians or degrees
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub struct Angle {
     /// The length unit expressed in meters
     in_radians: f64,
