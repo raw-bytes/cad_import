@@ -5,7 +5,7 @@ use log::{debug, error};
 use crate::{
     loader::{
         loader_rvm::{cad_data_creator::CADDataCreator, rvm_parser::RVMParser},
-        ExtensionMap, Loader, Options, OptionsDescriptor, Resource,
+        ExtensionMap, Loader, Options, OptionsDescriptor, Resource, TessellationOptions,
     },
     structure::CADData,
     Error,
@@ -53,9 +53,15 @@ impl Loader for LoaderRVM {
     fn read_with_options(
         &self,
         resource: &dyn Resource,
-        _: Option<Options>,
+        options: Option<Options>,
     ) -> Result<CADData, Error> {
-        let mut cad_creator = CADDataCreator::new();
+        let tessellation_options = if let Some(options) = options {
+            options.get_general_options().tessellation_options.clone()
+        } else {
+            TessellationOptions::default()
+        };
+
+        let mut cad_creator = CADDataCreator::new(tessellation_options);
 
         {
             let reader = resource.open()?;

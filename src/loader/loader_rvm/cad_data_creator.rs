@@ -1,24 +1,32 @@
-use log::{debug, trace};
-use nalgebra_glm::{Mat4, Vec3};
+use log::{debug, error, trace, warn};
+use nalgebra_glm::{Mat3, Mat4, Vec3};
 
 use crate::{
-    structure::{CADData, NodeId, Tree},
+    loader::{loader_rvm::tessellate::Tessellate, TessellationOptions},
+    structure::{CADData, NodeId, Shape, ShapePart, Tree},
     Length,
 };
 
-use super::rvm_parser::{RVMHeader, RVMInterpreter, RVMModelHeader};
+use super::{
+    primitive::Primitive,
+    rvm_parser::{RVMHeader, RVMInterpreter, RVMModelHeader},
+};
 
 /// The CAD creator creates the cad data structure based on the provided read events.
 pub struct CADDataCreator {
     node_stack: Vec<NodeId>,
+    tessellation_options: TessellationOptions,
     tree: Tree,
+    shape: Option<Shape>,
 }
 
 impl CADDataCreator {
-    pub fn new() -> Self {
+    pub fn new(tessellation_options: TessellationOptions) -> Self {
         Self {
             node_stack: Vec::new(),
+            tessellation_options,
             tree: Tree::new(),
+            shape: None,
         }
     }
 
@@ -43,8 +51,43 @@ impl RVMInterpreter for CADDataCreator {
         self.node_stack.push(root_id);
     }
 
-    fn primitive(&mut self, primitive: super::primitive::Primitive, matrix: [f32; 12]) {
-        println!("Primitive: {:?}, {:?}", primitive, matrix);
+    fn primitive(&mut self, primitive: Primitive, transform: &Mat3, translation: &Vec3) {
+        trace!(
+            "Tessellate Primitive: {:?}, M={:?}, T={:?}",
+            primitive,
+            transform,
+            translation
+        );
+
+        let result = match primitive {
+            Primitive::Box(box_data) => {
+                Some(box_data.tessellate(&self.tessellation_options, transform, translation))
+            }
+            _ => {
+                warn!("Primitive not supported: {:?}", primitive);
+                None
+            }
+        };
+
+        if let Some(mesh) = result {
+            match mesh {
+                Ok(mesh) => {
+                    let current_node_id = *self.node_stack.last().expect("No parent node found");
+
+                    let mut shape = if let Some(shape) = self.shape.take() {
+                        shape
+                    } else {
+                        let shape = Shape::new();
+                        shape
+                    };
+
+                    todo!("Material is missing and mesh as well");
+                }
+                Err(err) => {
+                    error!("Tessellation failed: {:?}", err);
+                }
+            }
+        }
     }
 
     fn begin_group(&mut self, group_name: String, translation: Vec3, material_id: usize) {

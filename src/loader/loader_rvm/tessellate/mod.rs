@@ -14,28 +14,23 @@ pub trait Tessellate {
     ///
     /// # Arguments
     /// * `options` - The options for tessellating the CAD model.
-    fn tessellate(&self, options: &TessellationOptions) -> Result<Mesh, Error>;
-}
-
-/// Extracts the translation from the given matrix.
-///
-/// # Arguments
-/// * `matrix` - The matrix from which the translation is extracted.
-#[inline]
-fn extract_translation(matrix: &[f32; 12]) -> Vec3 {
-    Vec3::from_column_slice(&matrix[9..12])
-}
-
-/// Extracts the 3x3 transformation matrix from the given 3x4 matrix.
-///
-/// # Arguments
-/// * `matrix` - The matrix from which the transformation matrix is extracted.
-fn extract_transformation(matrix: &[f32; 12]) -> Mat3 {
-    Mat3::from_column_slice(&matrix[..9])
+    /// * `transform` - The transformation matrix to apply to the mesh.
+    /// * `translation` - The translation vector to apply to the mesh.
+    fn tessellate(
+        &self,
+        options: &TessellationOptions,
+        transform: &Mat3,
+        translation: &Vec3,
+    ) -> Result<Mesh, Error>;
 }
 
 impl Tessellate for BoxData {
-    fn tessellate(&self, _: &TessellationOptions) -> Result<Mesh, Error> {
+    fn tessellate(
+        &self,
+        _: &TessellationOptions,
+        transform: &Mat3,
+        translation: &Vec3,
+    ) -> Result<Mesh, Error> {
         let dx = self.inner[0] / 2.0;
         let dy = self.inner[1] / 2.0;
         let dz = self.inner[2] / 2.0;
@@ -49,7 +44,7 @@ impl Tessellate for BoxData {
             16, 17, 18, 18, 19, 16, // Bottom
             20, 21, 22, 22, 23, 20,
         ];
-        let positions = vec![
+        let mut positions = vec![
             // Front
             Point3D::new(dx, dy, dz),
             Point3D::new(-dx, dy, dz),
@@ -81,7 +76,13 @@ impl Tessellate for BoxData {
             Point3D::new(dx, -dy, dz),
             Point3D::new(-dx, -dy, dz),
         ];
-        let normals = vec![
+
+        // Apply the transformation and translation to the positions.
+        positions.iter_mut().for_each(|p| {
+            p.0 = transform * p.0 + translation;
+        });
+
+        let mut normals = vec![
             // Front
             Point3D::new(0f32, 0f32, 1f32),
             Point3D::new(0f32, 0f32, 1f32),
@@ -113,6 +114,12 @@ impl Tessellate for BoxData {
             Point3D::new(0f32, -1f32, 0f32),
             Point3D::new(0f32, -1f32, 0f32),
         ];
+
+        // Transform the normals using the normal transformation matrix.
+        let normal_mat = transform.transpose().try_inverse().unwrap();
+        normals.iter_mut().for_each(|n| {
+            n.0 = (normal_mat * n.0).normalize();
+        });
 
         let index_data = IndexData::Indices(indices);
         let mut vertices = Vertices::from_positions(positions);
@@ -138,7 +145,11 @@ mod test {
             inner: [2.0, 2.0, 2.0],
         };
         let options = TessellationOptions::default();
-        let mesh = box_data.tessellate(&options).unwrap();
+        let transform = Mat3::identity();
+        let translation = Vec3::zeros();
+        let mesh = box_data
+            .tessellate(&options, &transform, &translation)
+            .unwrap();
 
         assert_eq!(mesh.get_vertices().get_positions().len(), 24);
         assert_eq!(mesh.get_vertices().get_normals().unwrap().len(), 24);

@@ -5,7 +5,7 @@ use crate::Error;
 use byteorder::{BigEndian, ReadBytesExt};
 use itertools::Itertools;
 use log::{debug, trace};
-use nalgebra_glm::Vec3;
+use nalgebra_glm::{Mat3, Vec3};
 
 use super::{identifier::Identifier, identifier_reader::IdentifierReader, primitive::Primitive};
 
@@ -27,8 +27,9 @@ pub trait RVMInterpreter {
     ///
     /// # Arguments
     /// * `primitive` - The data of the read primitive.
-    /// * `matrix` - The transformation matrix of the primitive.
-    fn primitive(&mut self, primitive: Primitive, matrix: [f32; 12]);
+    /// * `transform` - The 3x3 transformation matrix applied to the mesh.
+    /// * `translation` - The translation vector applied to the mesh.
+    fn primitive(&mut self, primitive: Primitive, transform: &Mat3, translation: &Vec3);
 
     /// Called when a new group is being read.
     ///
@@ -40,6 +41,23 @@ pub trait RVMInterpreter {
 
     /// Called when a group has been read completely.
     fn end_group(&mut self);
+}
+
+/// Extracts the translation from the given matrix.
+///
+/// # Arguments
+/// * `matrix` - The matrix from which the translation is extracted.
+#[inline]
+fn extract_translation(matrix: &[f32; 12]) -> Vec3 {
+    Vec3::from_column_slice(&matrix[9..12])
+}
+
+/// Extracts the 3x3 transformation matrix from the given 3x4 matrix.
+///
+/// # Arguments
+/// * `matrix` - The matrix from which the transformation matrix is extracted.
+fn extract_transformation(matrix: &[f32; 12]) -> Mat3 {
+    Mat3::from_column_slice(&matrix[..9])
 }
 
 /// The RVM header contains the information from the RVM file.
@@ -266,11 +284,16 @@ impl<'a, R: Read, Interpreter: RVMInterpreter> RVMParser<'a, R, Interpreter> {
 
         let matrix: [f32; 12] = self.read_f32_array()?;
 
+        // split the matrix into the 3x3 transformation matrix and the translation vector
+        let transform = extract_transformation(&matrix);
+        let translation = extract_translation(&matrix);
+
         // skip the bounding box
         self.skip_bytes(6)?;
 
         let primitive = Primitive::from_reader(&mut self.reader, primitive_type)?;
-        self.interpreter.primitive(primitive, matrix);
+        self.interpreter
+            .primitive(primitive, &transform, &translation);
 
         Ok(())
     }
