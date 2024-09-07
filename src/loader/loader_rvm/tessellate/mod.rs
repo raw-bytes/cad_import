@@ -1,3 +1,5 @@
+use nalgebra_glm::{Mat3, Vec3};
+
 use crate::{
     loader::TessellationOptions,
     structure::{IndexData, Mesh, Point3D, Primitives, Vertices},
@@ -13,6 +15,23 @@ pub trait Tessellate {
     /// # Arguments
     /// * `options` - The options for tessellating the CAD model.
     fn tessellate(&self, options: &TessellationOptions) -> Result<Mesh, Error>;
+}
+
+/// Extracts the translation from the given matrix.
+///
+/// # Arguments
+/// * `matrix` - The matrix from which the translation is extracted.
+#[inline]
+fn extract_translation(matrix: &[f32; 12]) -> Vec3 {
+    Vec3::from_column_slice(&matrix[9..12])
+}
+
+/// Extracts the 3x3 transformation matrix from the given 3x4 matrix.
+///
+/// # Arguments
+/// * `matrix` - The matrix from which the transformation matrix is extracted.
+fn extract_transformation(matrix: &[f32; 12]) -> Mat3 {
+    Mat3::from_column_slice(&matrix[..9])
 }
 
 impl Tessellate for BoxData {
