@@ -1,7 +1,10 @@
 use crate::basic_types::{Color, RGB};
 
+/// The material of a shape
 pub enum Material {
+    /// No material is assigned to the shape
     None,
+    /// A Phong material is assigned to the shape
     PhongMaterial(PhongMaterialData),
 }
 

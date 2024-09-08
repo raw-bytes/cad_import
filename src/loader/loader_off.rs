@@ -229,7 +229,7 @@ impl LoaderOff {
 
         // create mesh and shape from the given vertices and primitives
         let mesh = Mesh::new(vertices, primitives)?;
-        let part = ShapePart::new(Rc::new(mesh), Default::default());
+        let part = ShapePart::new_with_material(Rc::new(mesh), Default::default());
         let mut shape = Shape::new();
         shape.add_part(part);
 

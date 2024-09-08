@@ -464,7 +464,7 @@ impl CADDataCreator {
             }
 
             let mesh = Mesh::new(vertices, mesh_primitives)?;
-            shape.add_part(ShapePart::new(Rc::new(mesh), material));
+            shape.add_part(ShapePart::new_with_material(Rc::new(mesh), material));
         }
 
         Ok(shape)
