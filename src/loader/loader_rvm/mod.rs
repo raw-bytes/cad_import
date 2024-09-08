@@ -6,5 +6,6 @@ mod primitive;
 mod rvm_parser;
 mod tessellate;
 mod test_rvm;
+mod material;
 
 pub use loader_rvm::LoaderRVM;
