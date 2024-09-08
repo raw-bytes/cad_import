@@ -7,7 +7,7 @@ use std::{
 use nalgebra_glm::Mat4;
 
 use crate::{
-    structure::{MetaDataNode, Shape},
+    structure::{Material, MetaDataNode, Shape},
     ID,
 };
 
@@ -21,6 +21,7 @@ pub struct Node {
     transform: Option<Mat4>,
     shapes: Vec<Rc<Shape>>,
     children: Vec<NodeId>,
+    material: Rc<Material>,
 }
 
 impl Node {
@@ -36,6 +37,7 @@ impl Node {
             transform: None,
             shapes: Vec::new(),
             children: Vec::new(),
+            material: Rc::new(Material::None),
         }
     }
 
@@ -65,6 +67,19 @@ impl Node {
     /// * `metadata` - The metadata to set for this node.
     pub fn set_metadata(&mut self, metadata: Arc<MetaDataNode>) {
         self.metadata = Some(metadata);
+    }
+
+    /// Returns the material of the node.
+    pub fn get_material(&self) -> Rc<Material> {
+        self.material.clone()
+    }
+
+    /// Sets the material of the node.
+    ///
+    /// # Arguments
+    /// * `material` - The material to set for this node.
+    pub fn set_material(&mut self, material: Rc<Material>) {
+        self.material = material;
     }
 
     /// Adds the given node as child.

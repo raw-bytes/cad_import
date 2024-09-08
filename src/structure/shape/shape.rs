@@ -13,7 +13,14 @@ pub struct ShapePart {
 }
 
 impl ShapePart {
-    pub fn new(mesh: Rc<Mesh>, material: Rc<Material>) -> Self {
+    pub fn new(mesh: Rc<Mesh>) -> Self {
+        Self {
+            mesh,
+            material: Rc::new(Material::None),
+        }
+    }
+
+    pub fn new_with_material(mesh: Rc<Mesh>, material: Rc<Material>) -> Self {
         Self { mesh, material }
     }
 
