@@ -40,7 +40,7 @@ pub struct TessellationOptions {
     /// The maximum length of a single edge in the tessellated surface.
     pub max_length: Option<Length>,
 
-    /// The maximum angle between two adjacent edges in the tessellated surface in radians.
+    /// The maximum angle in between normals of two adjacent polygons
     pub max_angle: Option<Angle>,
 }
 
