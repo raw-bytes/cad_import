@@ -209,6 +209,74 @@ fn determine_num_segments_for_circle(
     num_segments
 }
 
+/// The tessellation parameter for the cylinder.
+#[derive(Clone, Debug)]
+struct CylinderTessellationParameter {
+    /// The number of radial segments, i.e., the number of circle at the bottom and top of the
+    /// cylinder around the center.
+    /// 2 is the minimum number of radial segments and means that the cylinder has a center and
+    /// one outer circle.
+    pub num_radial_circles: usize,
+
+    /// The number of height segments, i.e., the number of segments along the height of the cylinder.
+    /// 2 is the minimum number of height segments and means that the cylinder has a top and a bottom.
+    pub num_height_segments: usize,
+
+    /// The number of segments per circle.
+    pub num_segments_per_circle: usize,
+}
+
+/// Determines the tessellation parameter for the cylinder based on the tessellation options and
+/// the dimensions of the cylinder.
+///
+/// # Arguments
+/// * `r` - The radius of the cylinder.
+/// * `h` - The height of the cylinder.
+/// * `tessellation_options` - The tessellation options to use.
+fn determine_cylinder_tessellation_parameter(
+    r: Length,
+    h: Length,
+    tessellation_options: &TessellationOptions,
+) -> CylinderTessellationParameter {
+    let max_length_mm = tessellation_options
+        .max_length
+        .map(|l| l.get_unit_in_meters() * 1e3f64);
+
+    let num_segments_per_circle = determine_num_segments_for_circle(r, tessellation_options);
+
+    // Determine the number of height segments based on the maximum length.
+    let num_height_segments = if let Some(max_length_mm) = max_length_mm {
+        if max_length_mm > 0f64 {
+            let height_mm = h.get_unit_in_meters() * 1e3f64;
+
+            2.max((height_mm / max_length_mm).ceil() as usize)
+        } else {
+            2
+        }
+    } else {
+        2
+    };
+
+    // Determine the number of radial segments based on the maximum length.
+    let num_radial_circles = if let Some(max_length_mm) = max_length_mm {
+        if max_length_mm > 0f64 {
+            let radius_mm = r.get_unit_in_meters() * 1e3f64;
+
+            2.max((radius_mm / max_length_mm).ceil() as usize)
+        } else {
+            2
+        }
+    } else {
+        2
+    };
+
+    CylinderTessellationParameter {
+        num_radial_circles,
+        num_height_segments,
+        num_segments_per_circle,
+    }
+}
+
 #[cfg(test)]
 mod test {
     use nalgebra_glm::DVec2 as Vec2;
@@ -381,5 +449,60 @@ mod test {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_determine_cylinder_tessellation_parameter() {
+        // test number of height segments
+        let r = determine_cylinder_tessellation_parameter(
+            Length::new(1.0),
+            Length::new(2.0),
+            &TessellationOptions {
+                max_length: Some(Length::new(0.5)),
+                ..TessellationOptions::default()
+            },
+        );
+        assert_eq!(r.num_height_segments, 4);
+
+        let r = determine_cylinder_tessellation_parameter(
+            Length::new(1.0),
+            Length::new(3.0),
+            &TessellationOptions {
+                max_length: Some(Length::new(0.1)),
+                ..TessellationOptions::default()
+            },
+        );
+        assert_eq!(r.num_height_segments, 30);
+
+        let r = determine_cylinder_tessellation_parameter(
+            Length::new(1.0),
+            Length::new(3.0),
+            &TessellationOptions {
+                max_length: Some(Length::new(0.0)),
+                ..TessellationOptions::default()
+            },
+        );
+        assert_eq!(r.num_height_segments, 2);
+
+        // test number of radial segments
+        let r = determine_cylinder_tessellation_parameter(
+            Length::new(1.0),
+            Length::new(2.0),
+            &TessellationOptions {
+                max_length: Some(Length::new(0.5)),
+                ..TessellationOptions::default()
+            },
+        );
+        assert_eq!(r.num_radial_circles, 2);
+
+        let r = determine_cylinder_tessellation_parameter(
+            Length::new(1.0),
+            Length::new(3.0),
+            &TessellationOptions {
+                max_length: Some(Length::new(0.1)),
+                ..TessellationOptions::default()
+            },
+        );
+        assert_eq!(r.num_radial_circles, 10);
     }
 }
