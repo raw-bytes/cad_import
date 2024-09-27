@@ -277,6 +277,124 @@ fn determine_cylinder_tessellation_parameter(
     }
 }
 
+impl Tessellate for CylinderData {
+    fn tessellate(
+        &self,
+        t: &TessellationOptions,
+        transform: &Mat3,
+        translation: &Vec3,
+    ) -> Result<Mesh, Error> {
+        let radius_mm = self.radius();
+        let height_mm = self.height();
+        let half_height_mm = height_mm / 2.0;
+
+        let t = determine_cylinder_tessellation_parameter(
+            Length::new(radius_mm as f64 * 1e-3),
+            Length::new(height_mm as f64 * 1e-3),
+            t,
+        );
+
+        // determine the overall number of vertices
+        let num_vertices_cap = (t.num_radial_circles - 1) * t.num_segments_per_circle + 1;
+        let num_vertices_side = t.num_height_segments * t.num_segments_per_circle;
+        let num_vertices = 2 * num_vertices_cap + num_vertices_side;
+
+        // determine the number of indices
+        let num_indices_cap = (t.num_radial_circles - 1) * t.num_segments_per_circle * 6
+            + t.num_segments_per_circle * 3;
+        let num_indices_side = (t.num_height_segments - 1) * t.num_segments_per_circle * 6;
+        let num_indices = 2 * num_indices_cap + num_indices_side;
+
+        // tessellate the unit circle in the x-y plane with the given number of segments
+        let unit_circle = (0..t.num_segments_per_circle)
+            .map(|i| {
+                let angle =
+                    2f32 * std::f32::consts::PI * i as f32 / t.num_segments_per_circle as f32;
+                Vec2::new(radius_mm * angle.cos(), -radius_mm * angle.sin())
+            })
+            .collect::<Vec<_>>();
+
+        // allocate space for the different vertex attributes
+        let mut normals: Vec<Normal> = Vec::with_capacity(num_vertices);
+        let mut positions: Vec<Point3D> = Vec::with_capacity(num_vertices);
+        let mut indices: Vec<u32> = Vec::with_capacity(num_indices);
+
+        // define the function for creating a cap
+        let create_cap = |positions: &mut Vec<Point3D>, normals: &mut Vec<Normal>, dir: f32| {
+            let z = half_height_mm * dir;
+
+            positions.push(Point3D::new(0f32, 0f32, z));
+            for circle_index in 1..t.num_radial_circles {
+                // determine the radius of the current circle
+                let cur_radius =
+                    radius_mm * (circle_index + 1) as f32 / t.num_radial_circles as f32;
+
+                // add the unit circle vertices to the positions with the current radius and z-coordinate
+                positions.extend(
+                    unit_circle
+                        .iter()
+                        .map(|p| Point3D::new(p.x * cur_radius, p.y * cur_radius, z)),
+                );
+            }
+
+            // fill up the normals with the negative z-axis for the bottom cap
+            normals.extend(
+                std::iter::repeat(Normal::new(0f32, 0f32, dir))
+                    .take(positions.len() - normals.len()),
+            );
+
+            todo!("Fill up the indices for the cap");
+        };
+
+        // add bottom cap
+        create_cap(&mut positions, &mut normals, -1f32);
+
+        // Create vertices of side segments. Note, that we duplicate the vertices of outer circles
+        // for the bottom and upper cap to create sharp edges.
+        for segment_index in 0..t.num_height_segments + 1 {
+            let f = segment_index as f32 / t.num_height_segments as f32;
+            let h = -half_height_mm + f * height_mm;
+
+            positions.extend(
+                unit_circle
+                    .iter()
+                    .map(|p| Point3D::new(p.x * radius_mm, p.y * radius_mm, h)),
+            );
+
+            normals.extend(unit_circle.iter().map(|p| Normal::new(p.x, p.y, 0f32)));
+
+            todo!("Fill up the indices for the side segments");
+        }
+
+        // create vertices of upper cap
+        create_cap(&mut positions, &mut normals, 1f32);
+
+        // Apply the transformation and translation to the positions.
+        positions.iter_mut().for_each(|p| {
+            p.0 = transform * p.0 + translation;
+        });
+
+        // Transform the normals using the normal transformation matrix.
+        let normal_mat = transform.transpose().try_inverse().unwrap();
+        normals.iter_mut().for_each(|n| {
+            n.0 = (normal_mat * n.0).normalize();
+        });
+
+        assert_eq!(positions.len(), normals.len());
+        debug_assert_eq!(positions.len(), num_vertices);
+        debug_assert_eq!(indices.len(), num_indices);
+
+        let index_data = IndexData::Indices(indices);
+        let mut vertices = Vertices::from_positions(positions);
+        vertices.set_normals(normals).unwrap();
+        let primitives =
+            Primitives::new(index_data, crate::structure::PrimitiveType::Triangles).unwrap();
+        let mesh = Mesh::new(vertices, primitives).unwrap();
+
+        Ok(mesh)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use nalgebra_glm::DVec2 as Vec2;

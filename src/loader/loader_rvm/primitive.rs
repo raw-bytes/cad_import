@@ -347,11 +347,13 @@ pub struct CylinderData {
 }
 
 impl CylinderData {
+    /// Get the radius of the cylinder in millimeters.
     #[inline]
     pub fn radius(&self) -> f32 {
         self.inner[0]
     }
 
+    /// Get the height of the cylinder in millimeters.
     #[inline]
     pub fn height(&self) -> f32 {
         self.inner[1]
