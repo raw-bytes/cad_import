@@ -343,6 +343,7 @@ impl PrimitiveData for LineData {
 
 #[derive(Debug, Default)]
 pub struct CylinderData {
+    /// The radius and height of the cylinder in millimeters.
     pub inner: [f32; 2],
 }
 

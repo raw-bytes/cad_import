@@ -81,7 +81,7 @@ impl CylinderTessellationOperator {
         );
 
         self.tessellate_cylinder_cap(CapLocation::Top);
-        self.tessellate_cylinder_side();
+        // self.tessellate_cylinder_side();
         self.tessellate_cylinder_cap(CapLocation::Bottom);
 
         // Apply the transformation and translation to the positions.
@@ -122,34 +122,63 @@ impl CylinderTessellationOperator {
         let radius_mm = self.radius_mm;
         let unit_circle = &self.unit_circle;
 
+        let num_segments = t.num_segments_per_circle as u32;
+
+        // Determine the direction of the cap based on the location.
         let dir = match cap_location {
             CapLocation::Top => 1f32,
             CapLocation::Bottom => -1f32,
         };
 
         let z = height_mm / 2f32 * dir;
-
         let vertex_offset = positions.len() as u32;
 
         // add the center vertex of the cap
         positions.push(Point3D::new(0f32, 0f32, z));
 
+        // create the different circles of the cap
         for circle_index in 1..t.num_radial_circles {
             // determine the radius of the current circle
             let cur_radius = radius_mm * (circle_index + 1) as f32 / t.num_radial_circles as f32;
 
-            // add the unit circle vertices to the positions with the current radius and z-coordinate
+            // determine the offset of the current circle in the positions array
+            let circle_vertex_offset = positions.len() as u32;
+
+            // Add the unit circle vertices to the positions with the current radius, z-coordinate
+            // and orientation. Depending on the direction, the orientation is either clockwise or
+            // counter-clockwise.
             positions.extend(
                 unit_circle
                     .iter()
-                    .map(|p| Point3D::new(p.x * cur_radius, p.y * cur_radius, z)),
+                    .map(|p| Point3D::new(p.x * cur_radius, dir * p.y * cur_radius, z)),
             );
 
-            // add the indices for the current circle
-            todo!("Add the indices for the current circle");
+            // Check if the current circle is the inner circle, consisting only of the center
+            // vertex and a circle or if it is an segment being consisting of two circles.
+            if circle_index == 1 {
+                for i in 0..num_segments {
+                    let i0 = vertex_offset; // center vertex
+                    let i1 = vertex_offset + 1 + i;
+                    let i2 = vertex_offset + 1 + (i + 1) % num_segments;
+
+                    indices.extend([i0, i1, i2]);
+                }
+            } else {
+                for i in 0..(t.num_segments_per_circle as u32) {
+                    let i0 = circle_vertex_offset + i;
+                    let i1 = circle_vertex_offset + (i + 1) % num_segments;
+
+                    let i2 = i0 + num_segments;
+                    let i3 = i1 + num_segments;
+
+                    indices.extend([i0, i1, i2]);
+                    indices.extend([i2, i3, i0]);
+                }
+            }
         }
 
-        // fill up the normals with the negative z-axis for the bottom cap
+        // Fill up the normals with the normal of the cap that is pointing either in negative or
+        // positive z-direction.
         normals.extend(
             std::iter::repeat(Normal::new(0f32, 0f32, dir)).take(positions.len() - normals.len()),
         );
@@ -288,7 +317,7 @@ impl CylinderTessellationOperator {
         (0..num_segments)
             .map(|i| {
                 let angle = 2f32 * std::f32::consts::PI * i as f32 / num_segments as f32;
-                Vec2::new(radius_mm * angle.cos(), -radius_mm * angle.sin())
+                Vec2::new(radius_mm * angle.cos(), radius_mm * angle.sin())
             })
             .collect()
     }
@@ -500,5 +529,49 @@ mod test {
             },
         );
         assert_eq!(r.num_radial_circles, 10);
+    }
+
+    #[test]
+    fn test_cylinder_tessellation() {
+        let mut op = CylinderTessellationOperator::new(
+            &CylinderData {
+                inner: [4000.0, 7000.0],
+            },
+            &TessellationOptions {
+                max_sag: Length::new(4e-3f64),
+                ..TessellationOptions::default()
+            },
+        );
+
+        op.tessellate(&Mat3::identity(), &Vec3::new(0f32, 0f32, 0f32));
+        let mesh = op.into_mesh();
+
+        // check the orientation of the triangles
+        let positions = mesh.get_vertices().get_positions();
+        let indices = mesh
+            .get_primitives()
+            .get_raw_index_data()
+            .get_indices_ref()
+            .unwrap();
+        indices.chunks(3).for_each(|triangle| {
+            let v0 = positions[triangle[0] as usize].0;
+            let v1 = positions[triangle[1] as usize].0;
+            let v2 = positions[triangle[2] as usize].0;
+
+            let a = v1 - v0;
+            let b = v2 - v0;
+
+            let n = a.cross(&b).normalize();
+
+            assert!(
+                n.dot(&v0) > 0f32,
+                "Normal has wrong orientation. Indices={:?} Triangle=({:?},{:?},{:?}) Normal: {:?}",
+                triangle,
+                v0,
+                v1,
+                v2,
+                n
+            );
+        });
     }
 }
