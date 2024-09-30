@@ -105,7 +105,7 @@ impl CylinderTessellationOperator {
         vertices.set_normals(self.normals).unwrap();
         let primitives =
             Primitives::new(index_data, crate::structure::PrimitiveType::Triangles).unwrap();
-        Mesh::new(vertices, primitives).unwrap()
+        Mesh::new(vertices, primitives).expect("Failed to create mesh")
     }
 
     /// Tessellates one of the caps of the cylinder, i.e. the top or the bottom cap.
@@ -125,9 +125,9 @@ impl CylinderTessellationOperator {
         let num_segments = t.num_segments_per_circle as u32;
 
         // Determine the direction of the cap based on the location.
-        let dir = match cap_location {
-            CapLocation::Top => 1f32,
-            CapLocation::Bottom => -1f32,
+        let (dir, d) = match cap_location {
+            CapLocation::Top => (1f32, 0),
+            CapLocation::Bottom => (-1f32, 1),
         };
 
         let z = height_mm / 2f32 * dir;
@@ -150,7 +150,7 @@ impl CylinderTessellationOperator {
             positions.extend(
                 unit_circle
                     .iter()
-                    .map(|p| Point3D::new(p.x * cur_radius, dir * p.y * cur_radius, z)),
+                    .map(|p| Point3D::new(p.x * cur_radius, p.y * cur_radius, z)),
             );
 
             // Check if the current circle is the inner circle, consisting only of the center
@@ -158,21 +158,21 @@ impl CylinderTessellationOperator {
             if circle_index == 1 {
                 for i in 0..num_segments {
                     let i0 = vertex_offset; // center vertex
-                    let i1 = vertex_offset + 1 + i;
-                    let i2 = vertex_offset + 1 + (i + 1) % num_segments;
+                    let i1 = vertex_offset + 1 + (i + d) % num_segments;
+                    let i2 = vertex_offset + 1 + (i + (1 + d) % 2) % num_segments;
 
                     indices.extend([i0, i1, i2]);
                 }
             } else {
                 for i in 0..(t.num_segments_per_circle as u32) {
-                    let i0 = circle_vertex_offset + i;
-                    let i1 = circle_vertex_offset + (i + 1) % num_segments;
+                    let i2 = circle_vertex_offset + (i + d) % num_segments;
+                    let i3 = circle_vertex_offset + (i + (1 + d) % 2) % num_segments;
 
-                    let i2 = i0 + num_segments;
-                    let i3 = i1 + num_segments;
+                    let i0 = i2 - num_segments;
+                    let i1 = i3 - num_segments;
 
-                    indices.extend([i0, i1, i2]);
-                    indices.extend([i2, i3, i0]);
+                    indices.extend([i1, i0, i2]);
+                    indices.extend([i1, i2, i3]);
                 }
             }
         }
@@ -539,6 +539,7 @@ mod test {
             },
             &TessellationOptions {
                 max_sag: Length::new(4e-3f64),
+                max_length: Some(Length::new(1.0)),
                 ..TessellationOptions::default()
             },
         );
