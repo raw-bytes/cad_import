@@ -31,8 +31,8 @@ impl CylinderTessellationOperator {
         let radius_mm = cylinder_data.radius();
 
         let t = Self::determine_cylinder_tessellation_parameter(
-            Length::new(radius_mm as f64 * 1e3f64),
-            Length::new(height_mm as f64 * 1e3f64),
+            Length::new(radius_mm as f64 * 1e-3f64),
+            Length::new(height_mm as f64 * 1e-3f64),
             tessellation_options,
         );
 
