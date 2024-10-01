@@ -371,7 +371,7 @@ impl PrimitiveData for CylinderData {
 
 #[derive(Debug, Default)]
 pub struct SphereData {
-    diameter: f32,
+    pub diameter: f32,
 }
 
 impl SphereData {
