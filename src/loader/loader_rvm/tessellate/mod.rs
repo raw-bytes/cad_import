@@ -1,7 +1,9 @@
 use cylinder::CylinderTessellationOperator;
 use nalgebra_glm::{Mat3, Vec3};
+use sphere::SphereTessellationOperator;
 
 mod cylinder;
+mod sphere;
 
 use crate::{
     loader::TessellationOptions,
@@ -9,7 +11,7 @@ use crate::{
     Error,
 };
 
-use super::primitive::{BoxData, CylinderData};
+use super::primitive::{BoxData, CylinderData, SphereData};
 
 /// The tessellate trait is used to convert a CAD model to a mesh.
 pub trait Tessellate {
@@ -143,6 +145,22 @@ impl Tessellate for CylinderData {
         translation: &Vec3,
     ) -> Result<Mesh, Error> {
         let mut tessellation_operator = CylinderTessellationOperator::new(self, t);
+        tessellation_operator.tessellate(transform, translation);
+
+        let mesh = tessellation_operator.into_mesh();
+
+        Ok(mesh)
+    }
+}
+
+impl Tessellate for SphereData {
+    fn tessellate(
+        &self,
+        t: &TessellationOptions,
+        transform: &Mat3,
+        translation: &Vec3,
+    ) -> Result<Mesh, Error> {
+        let mut tessellation_operator = SphereTessellationOperator::new(self, t);
         tessellation_operator.tessellate(transform, translation);
 
         let mesh = tessellation_operator.into_mesh();

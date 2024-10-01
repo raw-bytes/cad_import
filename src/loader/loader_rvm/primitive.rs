@@ -375,6 +375,7 @@ pub struct SphereData {
 }
 
 impl SphereData {
+    /// Get the diameter of the sphere in millimeters.
     #[inline]
     pub fn diameter(&self) -> f32 {
         self.diameter

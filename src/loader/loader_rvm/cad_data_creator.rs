@@ -72,6 +72,9 @@ impl RVMInterpreter for CADDataCreator {
             Primitive::Cylinder(cylinder_data) => {
                 Some(cylinder_data.tessellate(&self.tessellation_options, transform, translation))
             }
+            Primitive::Sphere(sphere_data) => {
+                Some(sphere_data.tessellate(&self.tessellation_options, transform, translation))
+            }
             _ => {
                 warn!("Primitive not supported: {:?}", primitive);
                 None
