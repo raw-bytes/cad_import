@@ -47,7 +47,7 @@ impl CylinderTessellationOperator {
         let num_indices_side = (t.num_height_segments - 1) * t.num_segments_per_circle * 6;
         let num_indices = 2 * num_indices_cap + num_indices_side;
 
-        let unit_circle = Self::tessellate_unit_sphere_2d(radius_mm, t.num_segments_per_circle);
+        let unit_circle = Self::tessellate_unit_sphere_2d(t.num_segments_per_circle);
 
         Self {
             height_mm,
@@ -81,7 +81,7 @@ impl CylinderTessellationOperator {
         );
 
         self.tessellate_cylinder_cap(CapLocation::Top);
-        // self.tessellate_cylinder_side();
+        self.tessellate_cylinder_side();
         self.tessellate_cylinder_cap(CapLocation::Bottom);
 
         // Apply the transformation and translation to the positions.
@@ -186,7 +186,57 @@ impl CylinderTessellationOperator {
 
     /// Tessellates the side of the cylinder.
     fn tessellate_cylinder_side(&mut self) {
-        todo!("Tessellate the side of the cylinder");
+        let positions = &mut self.positions;
+        let normals = &mut self.normals;
+        let indices = &mut self.indices;
+
+        let t = &self.tessellation_parameter;
+        let height_mm = self.height_mm;
+        let half_height_mm = height_mm / 2f32;
+        let radius_mm = self.radius_mm;
+        let unit_circle = &self.unit_circle;
+
+        let num_segments = t.num_segments_per_circle as u32;
+        let num_height_segments = t.num_height_segments as u32;
+
+        for height_segment_index in 0..(num_height_segments + 1) {
+            // determine the height of the current segment
+            let z = height_mm * height_segment_index as f32 / num_height_segments as f32
+                - half_height_mm;
+
+            let vertex_offset = positions.len() as u32;
+
+            // Add the unit circle vertices to the positions with the current radius, z-coordinate
+            // and orientation. Depending on the direction, the orientation is either clockwise or
+            // counter-clockwise.
+            positions.extend(
+                unit_circle
+                    .iter()
+                    .map(|p| Point3D::new(p.x * radius_mm, p.y * radius_mm, z)),
+            );
+
+            // Add the unit circle vertices as normals.
+            normals.extend(
+                unit_circle
+                    .iter()
+                    .map(|p| Normal::new(p.x, p.y, 0f32))
+                    .collect::<Vec<Normal>>(),
+            );
+
+            // Add the indices for the triangles of the current segment if it is not the last
+            // segment.
+            if height_segment_index < num_height_segments {
+                for i in 0..num_segments {
+                    let i1 = vertex_offset + i;
+                    let i0 = vertex_offset + (i + 1) % num_segments;
+                    let i2 = i0 + num_segments;
+                    let i3 = i1 + num_segments;
+
+                    indices.extend([i1, i0, i2]);
+                    indices.extend([i1, i2, i3]);
+                }
+            }
+        }
     }
 
     /// Determines the required number of segments for the specified circle based on the tessellation
@@ -307,17 +357,16 @@ impl CylinderTessellationOperator {
         }
     }
 
-    /// Tessellates a unit sphere in 2D in the x-y plane in counter-clockwise order with the specified
-    /// radius and number of segments.
+    /// Tessellates a unit circle in 2D in the x-y plane in counter-clockwise order with the specified
+    /// number of segments.
     ///
     /// # Arguments
-    /// * `radius_mm` - The radius of the sphere in millimeters.
     /// * `num_segments` - The number of segments to use.
-    fn tessellate_unit_sphere_2d(radius_mm: f32, num_segments: usize) -> Vec<Vec2> {
+    fn tessellate_unit_sphere_2d(num_segments: usize) -> Vec<Vec2> {
         (0..num_segments)
             .map(|i| {
                 let angle = 2f32 * std::f32::consts::PI * i as f32 / num_segments as f32;
-                Vec2::new(radius_mm * angle.cos(), radius_mm * angle.sin())
+                Vec2::new(angle.cos(), angle.sin())
             })
             .collect()
     }
@@ -549,6 +598,7 @@ mod test {
 
         // check the orientation of the triangles
         let positions = mesh.get_vertices().get_positions();
+        let normals = mesh.get_vertices().get_normals().unwrap();
         let indices = mesh
             .get_primitives()
             .get_raw_index_data()
@@ -559,6 +609,12 @@ mod test {
             let v1 = positions[triangle[1] as usize].0;
             let v2 = positions[triangle[2] as usize].0;
 
+            let n0 = normals[triangle[0] as usize].0;
+            let n1 = normals[triangle[1] as usize].0;
+            let n2 = normals[triangle[2] as usize].0;
+
+            let face_normal = (n0 + n1 + n2).normalize();
+
             let a = v1 - v0;
             let b = v2 - v0;
 
@@ -566,11 +622,12 @@ mod test {
 
             assert!(
                 n.dot(&v0) > 0f32,
-                "Normal has wrong orientation. Indices={:?} Triangle=({:?},{:?},{:?}) Normal: {:?}",
+                "Normal has wrong orientation. Indices={:?}, Triangle=({:?},{:?},{:?}), Face Normal: {:?}, Calculated Normal: {:?}",
                 triangle,
                 v0,
                 v1,
                 v2,
+                face_normal,
                 n
             );
         });
