@@ -30,8 +30,8 @@ const ICOSAHEDRON_INDICES: [u32; 60] = [
     11, 1, 11, 10, 3, 0, 8, 4, 0, 6, 9, 1, 4, 10, 1, 11, 6, 2, 5, 8, 2, 9, 7, 3, 10, 5, 3, 7, 11,
 ];
 
-/// The cylinder tessellation operator is used to tessellate a cylinder based on the specified
-/// cylinder data and tessellation options.
+/// The sphere tessellation operator is used to tessellate a sphere by subdividing an icosahedron
+/// based on the specified sphere data and tessellation options.
 pub struct SphereTessellationOperator {
     radius_mm: f32,
 
@@ -52,7 +52,7 @@ impl SphereTessellationOperator {
     /// sphere based on the specified sphere data and tessellation options.
     ///
     /// # Arguments
-    /// * `sphere_data` - The cylinder data to use for the tessellation.
+    /// * `sphere_data` - The sphere data to use for the tessellation.
     /// * `tessellation_options` - The tessellation options to use for the tessellation.
     pub fn new(sphere_data: &SphereData, tessellation_options: &TessellationOptions) -> Self {
         let radius_mm = sphere_data.diameter() / 2.0;
@@ -76,8 +76,8 @@ impl SphereTessellationOperator {
     /// Function may only be called once.
     ///
     /// # Arguments
-    /// * `transform` - The transformation matrix to apply to the cylinder.
-    /// * `translation` - The translation vector to apply to the cylinder.
+    /// * `transform` - The transformation matrix to apply to the sphere.
+    /// * `translation` - The translation vector to apply to the sphere.
     pub fn tessellate(&mut self, transform: &Mat3, translation: &Vec3) {
         assert!(
             self.positions.is_empty(),

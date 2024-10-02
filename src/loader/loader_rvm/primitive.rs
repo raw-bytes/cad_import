@@ -440,6 +440,7 @@ impl PrimitiveData for PolygonsData {
 /// A facet defined by a list of loops, where the outer loop is the first loop.
 #[derive(Debug, Default)]
 pub struct Polygon {
+    /// Contours of the polygon, where the first contour is the outer contour.
     pub contours: Vec<Contour>,
 }
 
@@ -451,6 +452,7 @@ pub struct Contour {
 
 #[derive(Debug, Default)]
 pub struct Vertex {
+    /// The position as (x, y, z) in millimeters followed by the normal as (nx, ny, nz).
     pub inner: [f32; 6],
 }
 
