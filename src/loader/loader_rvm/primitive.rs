@@ -371,6 +371,7 @@ impl PrimitiveData for CylinderData {
 
 #[derive(Debug, Default)]
 pub struct SphereData {
+    /// The diameter of the sphere in millimeters.
     pub diameter: f32,
 }
 

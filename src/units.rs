@@ -39,6 +39,12 @@ impl Length {
     pub fn get_unit_in_meters(&self) -> f64 {
         self.in_meters
     }
+
+    /// Returns the unit in millimeters.
+    #[inline]
+    pub fn get_unit_in_millimeters(&self) -> f64 {
+        self.in_meters * 1e3f64
+    }
 }
 
 impl Debug for Length {

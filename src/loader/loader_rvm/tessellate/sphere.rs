@@ -35,9 +35,11 @@ const ICOSAHEDRON_INDICES: [u32; 60] = [
 pub struct SphereTessellationOperator {
     radius_mm: f32,
 
-    /// In order to guarantee all tessellation options are met, it is sufficient to only define the
-    /// maximum edge length.
-    max_edge_length: f32,
+    /// The maximal allowed edge length in millimeters.
+    max_edge_length_mm: f32,
+
+    /// The maximal allowed sag error in millimeters.
+    max_sag_error_mm: f32,
 
     /// The middle vertex of an edge is stored in a hashmap to avoid duplicate vertices.
     map_edge_middle_vertex: HashMap<(u32, u32), u32>,
@@ -57,14 +59,17 @@ impl SphereTessellationOperator {
     pub fn new(sphere_data: &SphereData, tessellation_options: &TessellationOptions) -> Self {
         let radius_mm = sphere_data.diameter() / 2.0;
 
-        let max_edge_length = Self::determine_maximum_edge_length(
+        let max_edge_length_mm = Self::determine_maximum_edge_length(
             Length::new(radius_mm as f64 * 1e-3f64),
             tessellation_options,
         );
 
+        let max_sag_error_mm = tessellation_options.max_sag.get_unit_in_millimeters() as f32;
+
         Self {
             radius_mm,
-            max_edge_length,
+            max_edge_length_mm,
+            max_sag_error_mm,
             map_edge_middle_vertex: HashMap::new(),
             positions: Vec::new(),
             normals: Vec::new(),
@@ -148,8 +153,9 @@ impl SphereTessellationOperator {
             let v2 = self.positions[t[2] as usize];
 
             let edge_length = Self::determine_edge_length_of_triangle(v0, v1, v2);
+            let sag_error_mm = self.determine_sag_error_of_triangle(&v0, &v1, &v2);
 
-            if edge_length > self.max_edge_length {
+            if edge_length > self.max_edge_length_mm || sag_error_mm > self.max_sag_error_mm {
                 let v01 = self.register_middle_vertex(t[0], t[1]);
                 let v12 = self.register_middle_vertex(t[1], t[2]);
                 let v20 = self.register_middle_vertex(t[2], t[0]);
@@ -183,7 +189,7 @@ impl SphereTessellationOperator {
 
             let normal = (v0.0 + v1.0).normalize();
 
-            // create the middle point by reprojecting the middle point onto the sphere
+            // create the middle point by re-projecting the middle point onto the sphere
             let middle = Point3D(normal * self.radius_mm);
 
             let normal = Point3D(normal);
@@ -208,10 +214,21 @@ impl SphereTessellationOperator {
         radius: Length,
         tessellation_options: &TessellationOptions,
     ) -> f32 {
-        let mut max_length_mm = radius.get_unit_in_meters() as f32 * 1e3f32;
+        let radius_mm = radius.get_unit_in_millimeters() as f32;
+
+        // initialize the maximum edge length to the radius of the sphere
+        let mut max_length_mm = radius_mm;
 
         if let Some(max_length) = tessellation_options.max_length {
-            max_length_mm = max_length_mm.min(max_length.get_unit_in_meters() as f32 * 1e3f32);
+            max_length_mm = max_length_mm.min(max_length.get_unit_in_millimeters() as f32);
+        }
+
+        // If the maximum angle is defined, we need to determine the maximum edge length based on
+        // the maximum angle.
+        if let Some(max_angle) = tessellation_options.max_angle {
+            let max_angle_rad = max_angle.get_unit_in_radians();
+
+            if max_angle_rad > 0.0 {}
         }
 
         max_length_mm
@@ -230,61 +247,137 @@ impl SphereTessellationOperator {
 
         edge0.max(edge1).max(edge2)
     }
+
+    /// Determines the sag error of the triangle defined by the three vertices.
+    ///
+    /// # Arguments
+    /// * `v0` - The first vertex of the triangle.
+    /// * `v1` - The second vertex of the triangle.
+    /// * `v2` - The third vertex of the triangle.
+    #[inline]
+    fn determine_sag_error_of_triangle(&self, v0: &Point3D, v1: &Point3D, v2: &Point3D) -> f32 {
+        debug_assert!((v0.0.norm() - self.radius_mm).abs() <= self.radius_mm * 1e-6f32);
+        debug_assert!((v1.0.norm() - self.radius_mm).abs() <= self.radius_mm * 1e-6f32);
+        debug_assert!((v2.0.norm() - self.radius_mm).abs() <= self.radius_mm * 1e-6f32);
+
+        let m = (v0.0 + v1.0 + v2.0) / 3.0;
+        (m.norm() - self.radius_mm).abs()
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use crate::Angle;
+
     use super::*;
 
     #[test]
     fn test_sphere_tessellation() {
-        let t0 = std::time::Instant::now();
-        let sphere_data = SphereData { diameter: 1.0 };
-        let tessellation_options = TessellationOptions {
-            max_length: Some(Length::new(0.0001)),
-            ..Default::default()
-        };
+        let radius = [Length::new(1.0), Length::new(2.0), Length::new(4.0)];
 
-        let mut operator = SphereTessellationOperator::new(&sphere_data, &tessellation_options);
-        operator.tessellate(&Mat3::identity(), &Vec3::zeros());
+        let max_angle_error = [
+            None,
+            Some(Angle::new(0.7)),
+            Some(Angle::new(0.2)),
+            Some(Angle::new(0.1)),
+        ];
 
-        let mesh = operator.into_mesh();
+        let max_length_error = [None, Some(Length::new(0.5)), Some(Length::new(0.2))];
 
-        println!("Time: {:.2} ms", (t0.elapsed().as_secs_f64() * 1e3f64));
+        let max_sag_error = [Length::new(0.1), Length::new(0.05)];
 
-        println!(
-            "Number of vertices: {}",
-            mesh.get_vertices().get_positions().len()
-        );
-        println!(
-            "Number of triangles: {}",
-            mesh.get_primitives()
-                .get_raw_index_data()
-                .get_indices_ref()
-                .unwrap()
-                .len()
-                / 3
-        );
+        for r in radius {
+            for max_angle in &max_angle_error {
+                for max_edge_length in &max_length_error {
+                    for max_sag in &max_sag_error {
+                        let options = TessellationOptions {
+                            max_sag: *max_sag,
+                            max_length: *max_edge_length,
+                            max_angle: *max_angle,
+                        };
 
-        // check that all triangles are oriented correctly
-        let indices = mesh
-            .get_primitives()
-            .get_raw_index_data()
-            .get_indices_ref()
-            .unwrap();
-        let positions = mesh.get_vertices().get_positions();
-        for triangle in indices.chunks(3) {
-            let v0 = positions[triangle[0] as usize];
-            let v1 = positions[triangle[1] as usize];
-            let v2 = positions[triangle[2] as usize];
+                        let r_mm = r.get_unit_in_meters() as f32 * 1e3f32;
 
-            let a = v1.0 - v0.0;
-            let b = v2.0 - v0.0;
-            let normal = a.cross(&b).normalize();
+                        println!("Radius: {:.2} mm", r_mm);
+                        println!("Max angle: {:?}", max_angle);
+                        println!("Max edge length: {:?}", max_edge_length);
+                        println!(
+                            "Max sag: {:.2} mm",
+                            max_sag.get_unit_in_meters() as f32 * 1e3f32
+                        );
 
-            let center = (v0.0 + v1.0 + v2.0) / 3.0;
+                        // determine the maximum edge length
+                        let max_length_mm =
+                            SphereTessellationOperator::determine_maximum_edge_length(r, &options);
 
-            assert!(normal.dot(&center) > 0.0);
+                        println!("Max edge length: {:.2} mm", max_length_mm);
+
+                        // tessellate sphere based on the specified options
+                        let mut op = SphereTessellationOperator::new(
+                            &SphereData {
+                                diameter: r_mm * 2f32,
+                            },
+                            &options,
+                        );
+
+                        // tessellate and get mesh
+                        op.tessellate(&Mat3::identity(), &Vec3::zeros());
+                        let mesh = op.into_mesh();
+
+                        println!(
+                            "Number of vertices: {}",
+                            mesh.get_vertices().get_positions().len()
+                        );
+                        println!(
+                            "Number of triangles: {}",
+                            mesh.get_primitives().num_primitives()
+                        );
+
+                        // Iterate over the triangles of the mesh and check the constraints.
+                        let mut max_sag_error_tested = 0f32;
+                        let mut max_edge_length_tested = 0f32;
+                        mesh.get_primitives()
+                            .get_raw_index_data()
+                            .get_indices_ref()
+                            .unwrap()
+                            .chunks(3)
+                            .for_each(|t| {
+                                let v0 = mesh.get_vertices().get_positions()[t[0] as usize];
+                                let v1 = mesh.get_vertices().get_positions()[t[1] as usize];
+                                let v2 = mesh.get_vertices().get_positions()[t[2] as usize];
+
+                                let m = (v0.0 + v1.0 + v2.0) / 3.0;
+                                let sag_mm = (m.norm() - r_mm).abs();
+                                max_sag_error_tested = max_sag_error_tested.max(sag_mm);
+
+                                for (v0, v1) in [(v0, v1), (v1, v2), (v2, v0)] {
+                                    let edge = (v0.0 - v1.0).norm();
+
+                                    // Check the edge length constraint if it is defined.
+                                    if let Some(max_length) = max_edge_length {
+                                        assert!(
+                                            edge <= max_length.get_unit_in_millimeters() as f32,
+                                            "Edge length constraint violated"
+                                        );
+                                    }
+
+                                    let m = (v0.0 + v1.0) / 2.0;
+                                    let sag_mm = (m.norm() - r_mm).abs();
+                                    max_sag_error_tested = max_sag_error_tested.max(sag_mm);
+                                    max_edge_length_tested = max_edge_length_tested.max(edge);
+                                    let max_sag_mm = max_sag.get_unit_in_millimeters() as f32;
+                                    assert!(sag_mm <= max_sag_mm, "Sag constraint violated, Sag: {:.2} mm, but max sag is {:.2} mm. Triangle ({}, {}, {})", sag_mm, max_sag_mm, t[0], t[1], t[2]);
+                                }
+                            });
+
+                        println!("Max edge sag error(Tested): {:.2} mm", max_sag_error_tested);
+                        println!(
+                            "Max edge sag error(Tested): {:.2} mm",
+                            max_edge_length_tested
+                        );
+                    }
+                }
+            }
         }
     }
 }
