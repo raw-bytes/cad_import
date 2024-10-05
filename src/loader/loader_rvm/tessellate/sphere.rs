@@ -226,9 +226,14 @@ impl SphereTessellationOperator {
         // If the maximum angle is defined, we need to determine the maximum edge length based on
         // the maximum angle.
         if let Some(max_angle) = tessellation_options.max_angle {
-            let max_angle_rad = max_angle.get_unit_in_radians();
+            let max_angle_rad = max_angle.get_unit_in_radians() as f32;
 
-            if max_angle_rad > 0.0 {}
+            if max_angle_rad > 0.0 {
+                let m = 2f32 * radius_mm * (max_angle_rad / 2f32).sin();
+                if m > 0f32 {
+                    max_length_mm = max_length_mm.min(m);
+                }
+            }
         }
 
         max_length_mm
@@ -267,9 +272,56 @@ impl SphereTessellationOperator {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools;
+
     use crate::Angle;
 
     use super::*;
+
+    /// Computes the maximum angle between two adjacent triangles of the mesh.
+    ///
+    /// # Arguments
+    /// * `mesh` - The mesh to compute the maximum angle for.
+    fn determine_max_triangle_angle(mesh: &Mesh) -> f32 {
+        let mut max_angle = 0f32;
+
+        let mut edge_map = HashMap::new();
+
+        let indices = mesh
+            .get_primitives()
+            .get_raw_index_data()
+            .get_indices_ref()
+            .unwrap();
+        let positions = mesh.get_vertices().get_positions();
+
+        for triangle in indices.chunks_exact(3) {
+            let v0 = positions[triangle[0] as usize];
+            let v1 = positions[triangle[1] as usize];
+            let v2 = positions[triangle[2] as usize];
+
+            let n = (v1.0 - v0.0).cross(&(v2.0 - v0.0)).normalize();
+
+            for (i0, i1) in [
+                (triangle[0], triangle[1]),
+                (triangle[1], triangle[2]),
+                (triangle[2], triangle[0]),
+            ] {
+                let edge = (i0.min(i1), i0.max(i1));
+
+                // If the edge is already in the map, we can compute the angle between the two
+                // triangles. Otherwise, insert the normal of the triangle into the map with the
+                // given edge as key.
+                if let Some(n0) = edge_map.get(&edge) {
+                    let angle = n.dot(n0).acos();
+                    max_angle = max_angle.max(angle);
+                } else {
+                    edge_map.insert(edge, n);
+                }
+            }
+        }
+
+        max_angle
+    }
 
     #[test]
     fn test_sphere_tessellation() {
@@ -336,6 +388,7 @@ mod test {
                         // Iterate over the triangles of the mesh and check the constraints.
                         let mut max_sag_error_tested = 0f32;
                         let mut max_edge_length_tested = 0f32;
+                        let max_angle_tested = determine_max_triangle_angle(&mesh);
                         mesh.get_primitives()
                             .get_raw_index_data()
                             .get_indices_ref()
@@ -370,11 +423,19 @@ mod test {
                                 }
                             });
 
+                        if let Some(max_angle) = max_angle {
+                            assert!(
+                                max_angle_tested <= max_angle.get_unit_in_radians() as f32,
+                                "Max angle constraint violated"
+                            );
+                        }
+
                         println!("Max edge sag error(Tested): {:.2} mm", max_sag_error_tested);
                         println!(
                             "Max edge sag error(Tested): {:.2} mm",
                             max_edge_length_tested
                         );
+                        println!("Max angle error(Tested): {:.2} rad", max_angle_tested);
                     }
                 }
             }
