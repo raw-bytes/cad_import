@@ -451,7 +451,7 @@ pub struct Contour {
     pub inner: Vec<Vertex>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Copy, Clone)]
 pub struct Vertex {
     /// The position as (x, y, z) in millimeters followed by the normal as (nx, ny, nz).
     pub inner: [f32; 6],
