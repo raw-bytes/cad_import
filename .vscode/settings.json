@@ -1,7 +1,6 @@
 {
     "editor.formatOnSave": true,
     "cSpell.words": [
-        "Peekable",
         "AVEVA",
         "byteorder",
         "CNTB",
@@ -13,7 +12,9 @@
         "MODL",
         "nalgebra",
         "PDMS",
+        "Peekable",
         "Phong",
+        "tessellator",
         "Uninit",
         "vecs",
         "xbottom",
