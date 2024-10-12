@@ -31,7 +31,7 @@ impl Component for Float {
 pub struct Point3D(pub Vec3);
 
 impl Point3D {
-    pub fn new(x: f32, y: f32, z: f32) -> Self {
+    pub const fn new(x: f32, y: f32, z: f32) -> Self {
         Self(Vec3::new(x, y, z))
     }
 }

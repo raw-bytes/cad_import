@@ -46,14 +46,13 @@ impl Tessellate for BoxData {
         let dy = self.inner[1] / 2.0;
         let dz = self.inner[2] / 2.0;
 
-        let indices = [
-            // Front
-            0, 1, 2, 2, 3, 0, // Back
-            4, 5, 6, 6, 7, 4, // Left
-            8, 9, 10, 10, 11, 8, // Right
-            12, 13, 14, 14, 15, 12, // Top
-            16, 17, 18, 18, 19, 16, // Bottom
-            20, 21, 22, 22, 23, 20,
+        const INDICES: [u32; 36] = [
+            0, 1, 2, 2, 3, 0, // Front
+            4, 5, 6, 6, 7, 4, // Back
+            8, 9, 10, 10, 11, 8, // Left
+            12, 13, 14, 14, 15, 12, // Right
+            16, 17, 18, 18, 19, 16, // Top
+            20, 21, 22, 22, 23, 20, // Bottom
         ];
 
         let positions = [
@@ -89,7 +88,7 @@ impl Tessellate for BoxData {
             Point3D::new(-dx, -dy, dz),
         ];
 
-        let normals = [
+        const NORMALS: [Point3D; 24] = [
             // Front
             Point3D::new(0f32, 0f32, 1f32),
             Point3D::new(0f32, 0f32, 1f32),
@@ -122,8 +121,8 @@ impl Tessellate for BoxData {
             Point3D::new(0f32, -1f32, 0f32),
         ];
 
-        mesh_builder.add_vertices(positions, normals);
-        mesh_builder.add_triangles_from_slice(&indices);
+        mesh_builder.add_vertices_from_slice(&positions, &NORMALS);
+        mesh_builder.add_triangles_from_slice(&INDICES);
         mesh_builder.transform_vertices(transform, translation);
 
         let mesh = mesh_builder.into_mesh();

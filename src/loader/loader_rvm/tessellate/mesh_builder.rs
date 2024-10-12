@@ -60,6 +60,24 @@ impl MeshBuilder {
         index_offset
     }
 
+    /// Add new vertices to the mesh.
+    /// Panics with an assertion error if the number of positions and normals do not match.
+    /// Returns the index offset of the first vertex added.
+    ///
+    /// # Arguments
+    /// * `positions` - The positions of the vertices.
+    /// * `normals` - The normals of the vertices.
+    pub fn add_vertices_from_slice(&mut self, positions: &[Point3D], normals: &[Normal]) -> u32 {
+        let index_offset = self.positions.len() as u32;
+
+        self.positions.extend_from_slice(positions);
+        self.normals.extend_from_slice(normals);
+
+        assert_eq!(self.positions.len(), self.normals.len());
+
+        index_offset
+    }
+
     /// Adds a new vertex to the mesh and returns its index.
     ///
     /// # Arguments
