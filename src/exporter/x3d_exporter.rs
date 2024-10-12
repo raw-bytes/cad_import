@@ -147,7 +147,9 @@ impl<'a> X3DExporter<'a> {
     /// * `writer` - The XML writer to which the shape node will be added.
     /// * `part` - The shape part to be written out as shape.
     fn write_part<W: Write>(writer: &mut Writer<W>, part: &ShapePart) -> Result<(), XMLError> {
-        let shape = writer.create_element("Shape");
+        let shape = writer
+            .create_element("Shape")
+            .with_attribute(Attribute::from(("solid", "false")));
 
         shape.write_inner_content::<_, XMLError>(|writer| {
             // write material
