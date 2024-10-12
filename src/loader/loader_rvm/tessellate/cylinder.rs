@@ -2,9 +2,11 @@ use nalgebra_glm::{Mat3, Vec2, Vec3};
 
 use crate::{
     loader::{loader_rvm::primitive::CylinderData, TessellationOptions},
-    structure::{IndexData, Mesh, Normal, Normals, Point3D, Positions, Primitives, Vertices},
+    structure::{Mesh, Normal, Point3D},
     Length,
 };
+
+use super::mesh_builder::MeshBuilder;
 
 /// The cylinder tessellation operator is used to tessellate a cylinder based on the specified
 /// cylinder data and tessellation options.
@@ -13,11 +15,10 @@ pub struct CylinderTessellationOperator {
     radius_mm: f32,
 
     tessellation_parameter: CylinderTessellationParameter,
-    positions: Positions,
-    normals: Normals,
-    indices: Vec<u32>,
 
     unit_circle: Vec<Vec2>,
+
+    mesh_builder: MeshBuilder,
 }
 
 impl CylinderTessellationOperator {
@@ -53,9 +54,7 @@ impl CylinderTessellationOperator {
             height_mm,
             radius_mm,
             tessellation_parameter: t,
-            positions: Vec::with_capacity(num_vertices),
-            normals: Vec::with_capacity(num_vertices),
-            indices: Vec::with_capacity(num_indices),
+            mesh_builder: MeshBuilder::new_with_capacity(num_vertices, num_indices),
             unit_circle,
         }
     }
@@ -68,15 +67,7 @@ impl CylinderTessellationOperator {
     /// * `translation` - The translation vector to apply to the cylinder.
     pub fn tessellate(&mut self, transform: &Mat3, translation: &Vec3) {
         assert!(
-            self.positions.is_empty(),
-            "Tesselation has already been performed."
-        );
-        assert!(
-            self.normals.is_empty(),
-            "Tesselation has already been performed."
-        );
-        assert!(
-            self.indices.is_empty(),
+            self.mesh_builder.is_empty(),
             "Tesselation has already been performed."
         );
 
@@ -84,28 +75,12 @@ impl CylinderTessellationOperator {
         self.tessellate_cylinder_side();
         self.tessellate_cylinder_cap(CapLocation::Bottom);
 
-        // Apply the transformation and translation to the positions.
-        self.positions.iter_mut().for_each(|p| {
-            p.0 = transform * p.0 + translation;
-        });
-
-        // Transform the normals using the normal transformation matrix.
-        let normal_mat = transform.transpose().try_inverse().unwrap();
-        self.normals.iter_mut().for_each(|n| {
-            n.0 = (normal_mat * n.0).normalize();
-        });
-
-        assert_eq!(self.positions.len(), self.normals.len());
+        self.mesh_builder.transform_vertices(transform, translation);
     }
 
     /// Converts the tessellated cylinder into a mesh object.
     pub fn into_mesh(self) -> Mesh {
-        let index_data = IndexData::Indices(self.indices);
-        let mut vertices = Vertices::from_positions(self.positions);
-        vertices.set_normals(self.normals).unwrap();
-        let primitives =
-            Primitives::new(index_data, crate::structure::PrimitiveType::Triangles).unwrap();
-        Mesh::new(vertices, primitives).expect("Failed to create mesh")
+        self.mesh_builder.into_mesh()
     }
 
     /// Tessellates one of the caps of the cylinder, i.e. the top or the bottom cap.
@@ -113,9 +88,7 @@ impl CylinderTessellationOperator {
     /// # Arguments
     /// * `cap_location` - The location of the cap to tessellate.
     fn tessellate_cylinder_cap(&mut self, cap_location: CapLocation) {
-        let positions = &mut self.positions;
-        let normals = &mut self.normals;
-        let indices = &mut self.indices;
+        let mesh_builder = &mut self.mesh_builder;
 
         let t = &self.tessellation_parameter;
         let height_mm = self.height_mm;
@@ -131,10 +104,10 @@ impl CylinderTessellationOperator {
         };
 
         let z = height_mm / 2f32 * dir;
-        let vertex_offset = positions.len() as u32;
+        let normal = Normal::new(0f32, 0f32, dir);
 
         // add the center vertex of the cap
-        positions.push(Point3D::new(0f32, 0f32, z));
+        let vertex_offset = mesh_builder.add_vertex(Point3D::new(0f32, 0f32, z), normal);
 
         // create the different circles of the cap
         for circle_index in 1..t.num_radial_circles {
@@ -142,15 +115,16 @@ impl CylinderTessellationOperator {
             let cur_radius = radius_mm * (circle_index + 1) as f32 / t.num_radial_circles as f32;
 
             // determine the offset of the current circle in the positions array
-            let circle_vertex_offset = positions.len() as u32;
+            let circle_vertex_offset = mesh_builder.vertices_len() as u32;
 
             // Add the unit circle vertices to the positions with the current radius, z-coordinate
             // and orientation. Depending on the direction, the orientation is either clockwise or
             // counter-clockwise.
-            positions.extend(
+            mesh_builder.add_vertices(
                 unit_circle
                     .iter()
                     .map(|p| Point3D::new(p.x * cur_radius, p.y * cur_radius, z)),
+                std::iter::repeat(Normal::new(0f32, 0f32, dir)).take(unit_circle.len()),
             );
 
             // Check if the current circle is the inner circle, consisting only of the center
@@ -161,7 +135,7 @@ impl CylinderTessellationOperator {
                     let i1 = vertex_offset + 1 + (i + d) % num_segments;
                     let i2 = vertex_offset + 1 + (i + (1 + d) % 2) % num_segments;
 
-                    indices.extend([i0, i1, i2]);
+                    mesh_builder.add_triangle(&[i0, i1, i2]);
                 }
             } else {
                 for i in 0..(t.num_segments_per_circle as u32) {
@@ -171,24 +145,16 @@ impl CylinderTessellationOperator {
                     let i0 = i2 - num_segments;
                     let i1 = i3 - num_segments;
 
-                    indices.extend([i1, i0, i2]);
-                    indices.extend([i1, i2, i3]);
+                    mesh_builder.add_triangle(&[i1, i0, i2]);
+                    mesh_builder.add_triangle(&[i1, i2, i3]);
                 }
             }
         }
-
-        // Fill up the normals with the normal of the cap that is pointing either in negative or
-        // positive z-direction.
-        normals.extend(
-            std::iter::repeat(Normal::new(0f32, 0f32, dir)).take(positions.len() - normals.len()),
-        );
     }
 
     /// Tessellates the side of the cylinder.
     fn tessellate_cylinder_side(&mut self) {
-        let positions = &mut self.positions;
-        let normals = &mut self.normals;
-        let indices = &mut self.indices;
+        let mesh_builder = &mut self.mesh_builder;
 
         let t = &self.tessellation_parameter;
         let height_mm = self.height_mm;
@@ -199,28 +165,21 @@ impl CylinderTessellationOperator {
         let num_segments = t.num_segments_per_circle as u32;
         let num_height_segments = t.num_height_segments as u32;
 
+        let mut triangles_indices: Vec<u32> =
+            Vec::with_capacity((num_segments * 2 * num_height_segments) as usize);
         for height_segment_index in 0..(num_height_segments + 1) {
             // determine the height of the current segment
             let z = height_mm * height_segment_index as f32 / num_height_segments as f32
                 - half_height_mm;
 
-            let vertex_offset = positions.len() as u32;
-
             // Add the unit circle vertices to the positions with the current radius, z-coordinate
             // and orientation. Depending on the direction, the orientation is either clockwise or
             // counter-clockwise.
-            positions.extend(
+            let vertex_offset = mesh_builder.add_vertices(
                 unit_circle
                     .iter()
                     .map(|p| Point3D::new(p.x * radius_mm, p.y * radius_mm, z)),
-            );
-
-            // Add the unit circle vertices as normals.
-            normals.extend(
-                unit_circle
-                    .iter()
-                    .map(|p| Normal::new(p.x, p.y, 0f32))
-                    .collect::<Vec<Normal>>(),
+                unit_circle.iter().map(|p| Normal::new(p.x, p.y, 0f32)),
             );
 
             // Add the indices for the triangles of the current segment if it is not the last
@@ -232,11 +191,12 @@ impl CylinderTessellationOperator {
                     let i2 = i0 + num_segments;
                     let i3 = i1 + num_segments;
 
-                    indices.extend([i1, i0, i2]);
-                    indices.extend([i1, i2, i3]);
+                    triangles_indices.extend_from_slice(&[i1, i0, i2, i1, i2, i3]);
                 }
             }
         }
+
+        mesh_builder.add_triangles_from_slice(&triangles_indices);
     }
 
     /// Determines the required number of segments for the specified circle based on the tessellation

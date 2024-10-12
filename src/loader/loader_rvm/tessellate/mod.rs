@@ -1,19 +1,21 @@
 use cylinder::CylinderTessellationOperator;
+use mesh_builder::MeshBuilder;
 use nalgebra_glm::{Mat3, Vec3};
 use polygon::PolygonsTessellationOperator;
 use sphere::SphereTessellationOperator;
 
 mod cylinder;
+mod mesh_builder;
 mod polygon;
 mod sphere;
 
 use crate::{
     loader::TessellationOptions,
-    structure::{IndexData, Mesh, Point3D, Primitives, Vertices},
+    structure::{Mesh, Point3D},
     Error,
 };
 
-use super::primitive::{BoxData, CylinderData, PolygonsData, SphereData};
+use super::primitive::{BoxData, CylinderData, PolygonsData, PyramidData, SphereData};
 
 /// The tessellate trait is used to convert a CAD model to a mesh.
 pub trait Tessellate {
@@ -38,11 +40,13 @@ impl Tessellate for BoxData {
         transform: &Mat3,
         translation: &Vec3,
     ) -> Result<Mesh, Error> {
+        let mut mesh_builder = MeshBuilder::new();
+
         let dx = self.inner[0] / 2.0;
         let dy = self.inner[1] / 2.0;
         let dz = self.inner[2] / 2.0;
 
-        let indices = vec![
+        let indices = [
             // Front
             0, 1, 2, 2, 3, 0, // Back
             4, 5, 6, 6, 7, 4, // Left
@@ -51,7 +55,8 @@ impl Tessellate for BoxData {
             16, 17, 18, 18, 19, 16, // Bottom
             20, 21, 22, 22, 23, 20,
         ];
-        let mut positions = vec![
+
+        let positions = [
             // Front
             Point3D::new(dx, dy, dz),
             Point3D::new(-dx, dy, dz),
@@ -84,12 +89,7 @@ impl Tessellate for BoxData {
             Point3D::new(-dx, -dy, dz),
         ];
 
-        // Apply the transformation and translation to the positions.
-        positions.iter_mut().for_each(|p| {
-            p.0 = transform * p.0 + translation;
-        });
-
-        let mut normals = vec![
+        let normals = [
             // Front
             Point3D::new(0f32, 0f32, 1f32),
             Point3D::new(0f32, 0f32, 1f32),
@@ -122,18 +122,11 @@ impl Tessellate for BoxData {
             Point3D::new(0f32, -1f32, 0f32),
         ];
 
-        // Transform the normals using the normal transformation matrix.
-        let normal_mat = transform.transpose().try_inverse().unwrap();
-        normals.iter_mut().for_each(|n| {
-            n.0 = (normal_mat * n.0).normalize();
-        });
+        mesh_builder.add_vertices(positions, normals);
+        mesh_builder.add_triangles_from_slice(&indices);
+        mesh_builder.transform_vertices(transform, translation);
 
-        let index_data = IndexData::Indices(indices);
-        let mut vertices = Vertices::from_positions(positions);
-        vertices.set_normals(normals).unwrap();
-        let primitives =
-            Primitives::new(index_data, crate::structure::PrimitiveType::Triangles).unwrap();
-        let mesh = Mesh::new(vertices, primitives).unwrap();
+        let mesh = mesh_builder.into_mesh();
 
         Ok(mesh)
     }
@@ -184,6 +177,53 @@ impl Tessellate for PolygonsData {
         let mesh = tessellation_operator.into_mesh();
 
         Ok(mesh)
+    }
+}
+
+/// The base positions for a pyramid.
+const PYRAMID_BASE_POS: [f32; 24] = [
+    0.5, 0.5, -0.5, 0.5, -0.5, -0.5, -0.5, -0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5, 0.5, 0.5, -0.5,
+    0.5, -0.5, -0.5, 0.5, -0.5, 0.5, 0.5,
+];
+
+impl Tessellate for PyramidData {
+    fn tessellate(
+        &self,
+        t: &TessellationOptions,
+        transform: &Mat3,
+        translation: &Vec3,
+    ) -> Result<Mesh, Error> {
+        let positions: Vec<Point3D> = Vec::new();
+        let normals: Vec<Point3D> = Vec::new();
+        let indices: Vec<u32> = Vec::new();
+
+        // create coordinates of the pyramid based on the base positions
+        let mut points: Vec<Point3D> = PYRAMID_BASE_POS
+            .chunks_exact(3)
+            .enumerate()
+            .map(|(i, pyramid_point)| {
+                let x = if i < 4 {
+                    pyramid_point[0] * self.xbottom() - self.xoffset() * 0.5f32
+                } else {
+                    pyramid_point[0] * self.xtop() + self.xoffset() * 0.5f32
+                };
+
+                let y = if i < 4 {
+                    pyramid_point[1] * self.ybottom() - self.yoffset() * 0.5f32
+                } else {
+                    pyramid_point[1] * self.ytop() + self.yoffset() * 0.5f32
+                };
+
+                let z = pyramid_point[2] * self.height();
+
+                Point3D::new(x, y, z)
+            })
+            .collect();
+
+        // tessellate the sides of the pyramid
+        for i in 0..4usize {}
+
+        todo!("Implement tessellation of the pyramid.");
     }
 }
 

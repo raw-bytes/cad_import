@@ -4,9 +4,11 @@ use nalgebra_glm::{Mat3, Vec3};
 
 use crate::{
     loader::{loader_rvm::primitive::SphereData, TessellationOptions},
-    structure::{IndexData, Mesh, Normal, Normals, Point3D, Positions, Primitives, Vertices},
+    structure::{Mesh, Normal, Point3D},
     Length,
 };
+
+use super::mesh_builder::MeshBuilder;
 
 /// The vertices of an icosahedron.
 const ICOSAHEDRON_VERTICES: [Vec3; 12] = [
@@ -44,9 +46,8 @@ pub struct SphereTessellationOperator {
     /// The middle vertex of an edge is stored in a hashmap to avoid duplicate vertices.
     map_edge_middle_vertex: HashMap<(u32, u32), u32>,
 
-    positions: Positions,
-    normals: Normals,
-    indices: Vec<u32>,
+    /// The mesh builder for creating the mesh.
+    mesh_builder: MeshBuilder,
 }
 
 impl SphereTessellationOperator {
@@ -71,9 +72,7 @@ impl SphereTessellationOperator {
             max_edge_length_mm,
             max_sag_error_mm,
             map_edge_middle_vertex: HashMap::new(),
-            positions: Vec::new(),
-            normals: Vec::new(),
-            indices: Vec::new(),
+            mesh_builder: MeshBuilder::new(),
         }
     }
 
@@ -85,15 +84,7 @@ impl SphereTessellationOperator {
     /// * `translation` - The translation vector to apply to the sphere.
     pub fn tessellate(&mut self, transform: &Mat3, translation: &Vec3) {
         assert!(
-            self.positions.is_empty(),
-            "Tesselation has already been performed."
-        );
-        assert!(
-            self.normals.is_empty(),
-            "Tesselation has already been performed."
-        );
-        assert!(
-            self.indices.is_empty(),
+            self.mesh_builder.is_empty(),
             "Tesselation has already been performed."
         );
 
@@ -103,40 +94,22 @@ impl SphereTessellationOperator {
         // create the indices of the tessellated sphere
         self.create_indices();
 
-        // Apply the transformation and translation to the positions.
-        self.positions.iter_mut().for_each(|p| {
-            p.0 = transform * p.0 + translation;
-        });
-
-        // Transform the normals using the normal transformation matrix.
-        let normal_mat = transform.transpose().try_inverse().unwrap();
-        self.normals.iter_mut().for_each(|n| {
-            n.0 = (normal_mat * n.0).normalize();
-        });
-
-        assert_eq!(self.positions.len(), self.normals.len());
+        self.mesh_builder.transform_vertices(transform, translation);
     }
 
     /// Converts the tessellated sphere into a mesh object.
     pub fn into_mesh(self) -> Mesh {
-        let index_data = IndexData::Indices(self.indices);
-        let mut vertices = Vertices::from_positions(self.positions);
-        vertices.set_normals(self.normals).unwrap();
-        let primitives =
-            Primitives::new(index_data, crate::structure::PrimitiveType::Triangles).unwrap();
-        Mesh::new(vertices, primitives).expect("Failed to create mesh")
+        self.mesh_builder.into_mesh()
     }
 
     /// Registers the vertices of the icosahedron to initialize the tessellation.
     fn register_icosahedron_vertices(&mut self) {
-        self.positions.extend(
+        self.mesh_builder.add_vertices(
             ICOSAHEDRON_VERTICES
                 .iter()
                 .map(|v| Point3D(*v * self.radius_mm)),
+            ICOSAHEDRON_VERTICES.iter().map(|v| Normal { 0: *v }),
         );
-
-        self.normals
-            .extend(ICOSAHEDRON_VERTICES.iter().map(|v| Normal { 0: *v }));
     }
 
     /// Creates the indices of the tessellated sphere by subdividing the icosahedron until the
@@ -148,9 +121,9 @@ impl SphereTessellationOperator {
             .collect();
 
         while let Some(t) = triangle_stack.pop() {
-            let v0 = self.positions[t[0] as usize];
-            let v1 = self.positions[t[1] as usize];
-            let v2 = self.positions[t[2] as usize];
+            let v0 = self.mesh_builder.positions()[t[0] as usize];
+            let v1 = self.mesh_builder.positions()[t[1] as usize];
+            let v2 = self.mesh_builder.positions()[t[2] as usize];
 
             let edge_length = Self::determine_edge_length_of_triangle(v0, v1, v2);
             let sag_error_mm = self.determine_sag_error_of_triangle(&v0, &v1, &v2);
@@ -165,7 +138,7 @@ impl SphereTessellationOperator {
                 triangle_stack.push([t[2], v20, v12]);
                 triangle_stack.push([v01, v12, v20]);
             } else {
-                self.indices.extend_from_slice(&t);
+                self.mesh_builder.add_triangle(&t);
             }
         }
     }
@@ -184,8 +157,8 @@ impl SphereTessellationOperator {
         if let Some(index) = self.map_edge_middle_vertex.get(&edge) {
             *index
         } else {
-            let v0 = self.positions[v0 as usize];
-            let v1 = self.positions[v1 as usize];
+            let v0 = self.mesh_builder.positions()[v0 as usize];
+            let v1 = self.mesh_builder.positions()[v1 as usize];
 
             let normal = (v0.0 + v1.0).normalize();
 
@@ -194,10 +167,7 @@ impl SphereTessellationOperator {
 
             let normal = Point3D(normal);
 
-            let index = self.positions.len() as u32;
-            self.positions.push(middle);
-            self.normals.push(normal);
-
+            let index = self.mesh_builder.add_vertex(middle, normal);
             self.map_edge_middle_vertex.insert(edge, index);
 
             index
@@ -272,8 +242,6 @@ impl SphereTessellationOperator {
 
 #[cfg(test)]
 mod test {
-    use itertools::Itertools;
-
     use crate::Angle;
 
     use super::*;
