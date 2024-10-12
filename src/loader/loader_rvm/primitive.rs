@@ -45,6 +45,23 @@ impl Primitive {
             ))),
         }
     }
+
+    /// Returns the name of the primitive type.
+    pub fn name(&self) -> &str {
+        match self {
+            Primitive::Box(_) => "Box",
+            Primitive::Pyramid(_) => "Pyramid",
+            Primitive::RectangularTorus(_) => "RectangularTorus",
+            Primitive::CircularTorus(_) => "CircularTorus",
+            Primitive::EllipticalDish(_) => "EllipticalDish",
+            Primitive::SphericalDish(_) => "SphericalDish",
+            Primitive::Snout(_) => "Snout",
+            Primitive::Cylinder(_) => "Cylinder",
+            Primitive::Sphere(_) => "Sphere",
+            Primitive::Line(_) => "Line",
+            Primitive::Polygons(_) => "Polygons",
+        }
+    }
 }
 
 /// The trait for all primitive data types.
@@ -59,6 +76,7 @@ pub trait PrimitiveData: Default {
 /// A box whose center is at the origin with the specified size.
 #[derive(Debug, Default)]
 pub struct BoxData {
+    /// The size of the box along the x, y, and z axes.
     pub inner: [f32; 3],
 }
 

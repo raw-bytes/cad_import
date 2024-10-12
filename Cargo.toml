@@ -32,3 +32,4 @@ arrayvec = "0.7"
 
 [dev-dependencies]
 path-clean = "1.0"
+pretty_env_logger = "0.5"

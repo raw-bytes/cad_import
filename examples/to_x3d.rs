@@ -4,6 +4,7 @@ use cad_import::{
     exporter::X3DExporter,
     loader::{FileResource, Manager},
 };
+use log::LevelFilter;
 
 /// This example loads the given file and exports as X3D to the specified path
 fn usage() {
@@ -14,6 +15,31 @@ fn usage() {
         "mime-type: Optional parameter to specify the mimetype. If not provided, the extension
            of the file is used"
     );
+}
+
+/// Initializes the program logging
+///
+/// # Arguments
+/// * `filter` - The log level filter, i.e., the minimum log level to be logged.
+fn initialize_logging(filter: LevelFilter) {
+    pretty_env_logger::formatted_builder()
+        .filter_level(filter)
+        .init();
+
+    // env_logger::builder()
+    //     .format(|buf, record| {
+    //         writeln!(
+    //             buf,
+    //             "{}:{} {} [{}] - {}",
+    //             record.file().unwrap_or("unknown"),
+    //             record.line().unwrap_or(0),
+    //             chrono::Local::now().format("%Y-%m-%dT%H:%M:%S"),
+    //             record.level(),
+    //             record.args()
+    //         )
+    //     })
+    //     .filter_level(filter)
+    //     .init();
 }
 
 fn determine_mime_types(
@@ -97,6 +123,8 @@ fn run_program(input_file: &Path, x3d_file: &Path, mime_type: Option<&str>) -> b
 }
 
 fn main() {
+    initialize_logging(LevelFilter::Debug);
+
     let args: Vec<String> = env::args().collect();
     let args = &args[1..];
 

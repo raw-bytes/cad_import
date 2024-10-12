@@ -43,9 +43,9 @@ impl Tessellate for BoxData {
     ) -> Result<Mesh, Error> {
         let mut mesh_builder = MeshBuilder::new();
 
-        let dx = self.inner[0] / 2.0;
-        let dy = self.inner[1] / 2.0;
-        let dz = self.inner[2] / 2.0;
+        let dx = self.size_x() / 2.0;
+        let dy = self.size_y() / 2.0;
+        let dz = self.size_z() / 2.0;
 
         const INDICES: [u32; 36] = [
             0, 1, 2, 2, 3, 0, // Front

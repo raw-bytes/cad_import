@@ -59,7 +59,8 @@ impl RVMInterpreter for CADDataCreator {
 
     fn primitive(&mut self, primitive: Primitive, transform: &Mat3, translation: &Vec3) {
         trace!(
-            "Tessellate Primitive: {:?}, M={:?}, T={:?}",
+            "Tessellate Primitive {}: {:?}, M={:?}, T={:?}",
+            primitive.name(),
             primitive,
             transform,
             translation
@@ -78,8 +79,11 @@ impl RVMInterpreter for CADDataCreator {
             Primitive::Polygons(polygons_data) => {
                 Some(polygons_data.tessellate(&self.tessellation_options, transform, translation))
             }
+            Primitive::Pyramid(pyramid_data) => {
+                Some(pyramid_data.tessellate(&self.tessellation_options, transform, translation))
+            }
             _ => {
-                warn!("Primitive not supported: {:?}", primitive);
+                warn!("Primitive type {} not supported", primitive.name());
                 None
             }
         };
