@@ -92,6 +92,8 @@ impl PrimitiveData for BoxData {
 
 #[derive(Debug, Default)]
 pub struct PyramidData {
+    /// The values of the pyramid in the following order:
+    /// xbottom, ybottom, xtop, ytop, xoffset, yoffset, height.
     pub inner: [f32; 7],
 }
 

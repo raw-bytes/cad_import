@@ -1,3 +1,4 @@
+use arrayvec::ArrayVec;
 use cylinder::CylinderTessellationOperator;
 use mesh_builder::MeshBuilder;
 use nalgebra_glm::{Mat3, Vec3};
@@ -11,7 +12,7 @@ mod sphere;
 
 use crate::{
     loader::TessellationOptions,
-    structure::{Mesh, Point3D},
+    structure::{Mesh, Normal, Point3D},
     Error,
 };
 
@@ -188,41 +189,135 @@ const PYRAMID_BASE_POS: [f32; 24] = [
 impl Tessellate for PyramidData {
     fn tessellate(
         &self,
-        t: &TessellationOptions,
+        _: &TessellationOptions,
         transform: &Mat3,
         translation: &Vec3,
     ) -> Result<Mesh, Error> {
-        let positions: Vec<Point3D> = Vec::new();
-        let normals: Vec<Point3D> = Vec::new();
-        let indices: Vec<u32> = Vec::new();
+        let mut mesh_builder = MeshBuilder::new();
 
-        // create coordinates of the pyramid based on the base positions
-        let mut points: Vec<Point3D> = PYRAMID_BASE_POS
-            .chunks_exact(3)
-            .enumerate()
-            .map(|(i, pyramid_point)| {
-                let x = if i < 4 {
-                    pyramid_point[0] * self.xbottom() - self.xoffset() * 0.5f32
-                } else {
-                    pyramid_point[0] * self.xtop() + self.xoffset() * 0.5f32
-                };
+        // create coordinates of the pyramid based
+        let points: ArrayVec<Vec3, 24> =
+            ArrayVec::from_iter(PYRAMID_BASE_POS.chunks_exact(3).enumerate().map(
+                |(i, pyramid_point)| {
+                    let x = if i < 4 {
+                        pyramid_point[0] * self.xbottom() - self.xoffset() * 0.5f32
+                    } else {
+                        pyramid_point[0] * self.xtop() + self.xoffset() * 0.5f32
+                    };
 
-                let y = if i < 4 {
-                    pyramid_point[1] * self.ybottom() - self.yoffset() * 0.5f32
-                } else {
-                    pyramid_point[1] * self.ytop() + self.yoffset() * 0.5f32
-                };
+                    let y = if i < 4 {
+                        pyramid_point[1] * self.ybottom() - self.yoffset() * 0.5f32
+                    } else {
+                        pyramid_point[1] * self.ytop() + self.yoffset() * 0.5f32
+                    };
 
-                let z = pyramid_point[2] * self.height();
+                    let z = pyramid_point[2] * self.height();
 
-                Point3D::new(x, y, z)
-            })
-            .collect();
+                    Vec3::new(x, y, z)
+                },
+            ));
 
         // tessellate the sides of the pyramid
-        for i in 0..4usize {}
+        for i0 in 0..4usize {
+            // define the other points of the triangle
+            let i1 = (i0 + 1) % 4;
+            let j0 = i0 + 4;
+            let j1 = i1 + 4;
 
-        todo!("Implement tessellation of the pyramid.");
+            // extract the points for the current side of the pyramid
+            let p0 = Point3D(points[i0]);
+            let p1 = Point3D(points[i1]);
+            let p2 = Point3D(points[j0]);
+            let p3 = Point3D(points[j1]);
+
+            // determine triangles should be created, i.e., the triangles should not be degenerate
+            let t0 = !p0.eq(&p1) && !p1.eq(&p2) && !p0.eq(&p2);
+            let t1 = !p1.eq(&p3) && !p3.eq(&p2) && !p1.eq(&p2);
+
+            // add first triangle
+            if t0 {
+                let normal = Normal {
+                    0: (p2.0 - p0.0).cross(&(p1.0 - p0.0)).normalize(),
+                };
+                let vertex_offset =
+                    mesh_builder.add_vertices_from_slice(&[p0, p1, p2], &[normal; 3]);
+                mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 2, vertex_offset + 1]);
+            }
+
+            // add second triangle
+            if t1 {
+                let normal = Normal {
+                    0: (p2.0 - p1.0).cross(&(p3.0 - p1.0)).normalize(),
+                };
+
+                let vertex_offset = if t0 {
+                    mesh_builder.add_vertex(p3, normal) - 2
+                } else {
+                    mesh_builder.add_vertices_from_slice(&[p1, p2, p3], &[normal; 3])
+                };
+
+                mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 1, vertex_offset + 2]);
+            }
+        }
+
+        // add bottom cap
+        if !points[0].eq(&points[1]) && !points[1].eq(&points[2]) && !points[0].eq(&points[2]) {
+            let n0 = (points[1] - points[0])
+                .cross(&(points[2] - points[0]))
+                .normalize();
+            let n1 = (points[2] - points[0])
+                .cross(&(points[3] - points[0]))
+                .normalize();
+            let normal = Normal {
+                0: (n0 + n1).normalize(),
+            };
+
+            let vertex_offset = mesh_builder.add_vertices_from_slice(
+                &[
+                    Point3D(points[0]),
+                    Point3D(points[1]),
+                    Point3D(points[2]),
+                    Point3D(points[3]),
+                ],
+                &[normal; 4],
+            );
+
+            mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 1, vertex_offset + 2]);
+            mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 2, vertex_offset + 3]);
+        }
+
+        // add top cap
+        if !points[4].eq(&points[5]) && !points[5].eq(&points[6]) && !points[4].eq(&points[6]) {
+            let n0 = (points[6] - points[4])
+                .cross(&(points[5] - points[4]))
+                .normalize();
+            let n1 = (points[7] - points[4])
+                .cross(&(points[6] - points[4]))
+                .normalize();
+            let normal = Normal {
+                0: (n0 + n1).normalize(),
+            };
+
+            let vertex_offset = mesh_builder.add_vertices_from_slice(
+                &[
+                    Point3D(points[4]),
+                    Point3D(points[5]),
+                    Point3D(points[6]),
+                    Point3D(points[7]),
+                ],
+                &[normal; 4],
+            );
+
+            mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 2, vertex_offset + 1]);
+            mesh_builder.add_triangle(&[vertex_offset, vertex_offset + 3, vertex_offset + 2]);
+        }
+
+        // transform the vertices
+        mesh_builder.transform_vertices(transform, translation);
+
+        // create the mesh
+        let mesh = mesh_builder.into_mesh();
+        Ok(mesh)
     }
 }
 
@@ -281,5 +376,153 @@ mod test {
         }
 
         assert_eq!(total_area, 24f32);
+    }
+
+    /// Tests a simple pyramid, that is actually a box and checks if the normals and faces are
+    /// correct.
+    #[test]
+    fn test_tessellate_pyramid1() {
+        // create a pyramid that is actually a box
+        let box_data = PyramidData {
+            inner: [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 1.0],
+        };
+        let options = TessellationOptions::default();
+        let transform = Mat3::identity();
+        let translation = Vec3::zeros();
+        let mesh = box_data
+            .tessellate(&options, &transform, &translation)
+            .unwrap();
+
+        assert_eq!(mesh.get_vertices().get_positions().len(), 24);
+        assert_eq!(mesh.get_vertices().get_normals().unwrap().len(), 24);
+        assert_eq!(mesh.get_primitives().get_raw_index_data().num_indices(), 36);
+
+        let primitives = mesh.get_primitives();
+        assert_eq!(primitives.get_primitive_type(), PrimitiveType::Triangles);
+
+        let indices = primitives.get_raw_index_data().get_indices_ref().unwrap();
+
+        // iterate over the triangles and make sure the normals are pointing outwards and the
+        // area is correct
+        let mut total_area = 0f32;
+        let positions = mesh.get_vertices().get_positions();
+        let normals = mesh.get_vertices().get_normals().unwrap();
+        for triangle in indices.windows(3).step_by(3) {
+            let c = positions[triangle[0] as usize].0;
+            let a = positions[triangle[1] as usize].0 - c;
+            let b = positions[triangle[2] as usize].0 - c;
+
+            let n0 = normals[triangle[0] as usize].0;
+            let n1 = normals[triangle[1] as usize].0;
+            let n2 = normals[triangle[2] as usize].0;
+
+            let cross = a.cross(&b);
+            total_area += cross.norm() / 2f32;
+
+            let normal = cross.normalize();
+
+            assert!(
+                (1f32 - n0.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n0,
+                normal
+            );
+            assert!(
+                (1f32 - n1.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n1,
+                normal
+            );
+            assert!(
+                (1f32 - n2.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n2,
+                normal
+            );
+
+            // make sure the normal is pointing outwards
+            assert!(
+                c.dot(&normal) > 0f32,
+                "Normal is not pointing outwards. Reference={:?}, Normal={:?}",
+                c,
+                normal
+            );
+        }
+
+        assert_eq!(total_area, 6f32);
+    }
+
+    /// Tests a pyramid where the top is sharp.
+    #[test]
+    fn test_tessellate_pyramid2() {
+        // create a pyramid that is actually a box
+        let box_data = PyramidData {
+            inner: [1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0],
+        };
+        let options = TessellationOptions::default();
+        let transform = Mat3::identity();
+        let translation = Vec3::zeros();
+        let mesh = box_data
+            .tessellate(&options, &transform, &translation)
+            .unwrap();
+
+        assert_eq!(mesh.get_vertices().get_positions().len(), 16);
+        assert_eq!(mesh.get_vertices().get_normals().unwrap().len(), 16);
+        assert_eq!(mesh.get_primitives().get_raw_index_data().num_indices(), 18);
+
+        let primitives = mesh.get_primitives();
+        assert_eq!(primitives.get_primitive_type(), PrimitiveType::Triangles);
+
+        let indices = primitives.get_raw_index_data().get_indices_ref().unwrap();
+
+        // iterate over the triangles and make sure the normals are pointing outwards and the
+        // area is correct
+        let mut total_area = 0f32;
+        let positions = mesh.get_vertices().get_positions();
+        let normals = mesh.get_vertices().get_normals().unwrap();
+        for triangle in indices.windows(3).step_by(3) {
+            let c = positions[triangle[0] as usize].0;
+            let a = positions[triangle[1] as usize].0 - c;
+            let b = positions[triangle[2] as usize].0 - c;
+
+            let n0 = normals[triangle[0] as usize].0;
+            let n1 = normals[triangle[1] as usize].0;
+            let n2 = normals[triangle[2] as usize].0;
+
+            let cross = a.cross(&b);
+            total_area += cross.norm() / 2f32;
+
+            let normal = cross.normalize();
+
+            assert!(
+                (1f32 - n0.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n0,
+                normal
+            );
+            assert!(
+                (1f32 - n1.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n1,
+                normal
+            );
+            assert!(
+                (1f32 - n2.dot(&normal)).abs() < 1e-6f32,
+                "Normal is not consistent. Is={:?}, Should={:?}",
+                n2,
+                normal
+            );
+
+            // make sure the normal is pointing outwards
+            assert!(
+                c.dot(&normal) > 0f32,
+                "Normal is not pointing outwards. Reference={:?}, Normal={:?}",
+                c,
+                normal
+            );
+        }
+
+        let h = 1.25f32.sqrt();
+        assert_eq!(total_area, 2f32 * h + 1f32);
     }
 }

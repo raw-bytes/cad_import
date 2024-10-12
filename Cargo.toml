@@ -28,6 +28,7 @@ itertools = "0.13"
 lazy_static = "1.5"
 byteorder = "1.5"
 lyon_tessellation = "1"
+arrayvec = "0.7"
 
 [dev-dependencies]
 path-clean = "1.0"
