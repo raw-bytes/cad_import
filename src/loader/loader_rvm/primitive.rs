@@ -201,16 +201,20 @@ pub struct CircularTorusData {
 }
 
 impl CircularTorusData {
+    /// Returns the offset of the torus ring in millimeters to the center of the torus.
     #[inline]
     pub fn offset(&self) -> f32 {
         self.inner[0]
     }
 
+    /// Returns the radius of the torus ring in millimeters.
     #[inline]
     pub fn radius(&self) -> f32 {
         self.inner[1]
     }
 
+    /// Returns the angle of the torus in radians. That is, how much of the torus is drawn.
+    /// E.g. 2 * PI would draw the entire torus and PI would draw half of it.
     #[inline]
     pub fn angle(&self) -> f32 {
         self.inner[2]

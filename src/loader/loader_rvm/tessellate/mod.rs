@@ -9,6 +9,7 @@ mod cylinder;
 mod mesh_builder;
 mod polygon;
 mod sphere;
+mod utils;
 
 use crate::{
     loader::TessellationOptions,
@@ -139,8 +140,9 @@ impl Tessellate for CylinderData {
         transform: &Mat3,
         translation: &Vec3,
     ) -> Result<Mesh, Error> {
-        let mut tessellation_operator = CylinderTessellationOperator::new(self, t);
-        tessellation_operator.tessellate(transform, translation);
+        let mut tessellation_operator =
+            CylinderTessellationOperator::new(self, t, transform.clone());
+        tessellation_operator.tessellate(translation);
 
         let mesh = tessellation_operator.into_mesh();
 
@@ -155,8 +157,8 @@ impl Tessellate for SphereData {
         transform: &Mat3,
         translation: &Vec3,
     ) -> Result<Mesh, Error> {
-        let mut tessellation_operator = SphereTessellationOperator::new(self, t);
-        tessellation_operator.tessellate(transform, translation);
+        let mut tessellation_operator = SphereTessellationOperator::new(self, t, transform.clone());
+        tessellation_operator.tessellate(translation);
 
         let mesh = tessellation_operator.into_mesh();
 

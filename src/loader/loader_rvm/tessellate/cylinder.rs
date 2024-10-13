@@ -1,7 +1,10 @@
 use nalgebra_glm::{Mat3, Vec2, Vec3};
 
 use crate::{
-    loader::{loader_rvm::primitive::CylinderData, TessellationOptions},
+    loader::{
+        loader_rvm::{primitive::CylinderData, tessellate::utils::compute_spectral_norm},
+        TessellationOptions,
+    },
     structure::{Mesh, Normal, Point3D},
     Length,
 };
@@ -16,6 +19,8 @@ pub struct CylinderTessellationOperator {
 
     tessellation_parameter: CylinderTessellationParameter,
 
+    transform: Mat3,
+
     unit_circle: Vec<Vec2>,
 
     mesh_builder: MeshBuilder,
@@ -27,13 +32,20 @@ impl CylinderTessellationOperator {
     ///
     /// # Arguments
     /// * `cylinder_data` - The cylinder data to use for the tessellation.
-    pub fn new(cylinder_data: &CylinderData, tessellation_options: &TessellationOptions) -> Self {
+    /// * `tessellation_options` - The tessellation options to use.
+    /// * `transform` - The transformation matrix to apply to the cylinder.
+    pub fn new(
+        cylinder_data: &CylinderData,
+        tessellation_options: &TessellationOptions,
+        transform: Mat3,
+    ) -> Self {
         let height_mm = cylinder_data.height();
         let radius_mm = cylinder_data.radius();
 
+        let s = compute_spectral_norm(&transform);
         let t = Self::determine_cylinder_tessellation_parameter(
-            Length::new(radius_mm as f64 * 1e-3f64),
-            Length::new(height_mm as f64 * 1e-3f64),
+            Length::new((radius_mm * s) as f64 * 1e-3f64),
+            Length::new((height_mm * s) as f64 * 1e-3f64),
             tessellation_options,
         );
 
@@ -54,8 +66,9 @@ impl CylinderTessellationOperator {
             height_mm,
             radius_mm,
             tessellation_parameter: t,
-            mesh_builder: MeshBuilder::new_with_capacity(num_vertices, num_indices),
+            transform,
             unit_circle,
+            mesh_builder: MeshBuilder::new_with_capacity(num_vertices, num_indices),
         }
     }
 
@@ -63,9 +76,8 @@ impl CylinderTessellationOperator {
     /// Function may only be called once.
     ///
     /// # Arguments
-    /// * `transform` - The transformation matrix to apply to the cylinder.
     /// * `translation` - The translation vector to apply to the cylinder.
-    pub fn tessellate(&mut self, transform: &Mat3, translation: &Vec3) {
+    pub fn tessellate(&mut self, translation: &Vec3) {
         assert!(
             self.mesh_builder.is_empty(),
             "Tesselation has already been performed."
@@ -75,7 +87,8 @@ impl CylinderTessellationOperator {
         self.tessellate_cylinder_side();
         self.tessellate_cylinder_cap(CapLocation::Bottom);
 
-        self.mesh_builder.transform_vertices(transform, translation);
+        self.mesh_builder
+            .transform_vertices(&self.transform, translation);
     }
 
     /// Converts the tessellated cylinder into a mesh object.
@@ -551,9 +564,10 @@ mod test {
                 max_length: Some(Length::new(1.0)),
                 ..TessellationOptions::default()
             },
+            Mat3::identity(),
         );
 
-        op.tessellate(&Mat3::identity(), &Vec3::new(0f32, 0f32, 0f32));
+        op.tessellate(&Vec3::new(0f32, 0f32, 0f32));
         let mesh = op.into_mesh();
 
         // check the orientation of the triangles

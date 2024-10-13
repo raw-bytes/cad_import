@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use nalgebra_glm::{Mat3, Vec3};
 
 use crate::{
-    loader::{loader_rvm::primitive::SphereData, TessellationOptions},
+    loader::{
+        loader_rvm::{primitive::SphereData, tessellate::utils::compute_spectral_norm},
+        TessellationOptions,
+    },
     structure::{Mesh, Normal, Point3D},
     Length,
 };
@@ -40,6 +43,9 @@ pub struct SphereTessellationOperator {
     /// The maximal allowed edge length in millimeters.
     max_edge_length_mm: f32,
 
+    /// The transformation applied to the sphere.
+    transform: Mat3,
+
     /// The maximal allowed sag error in millimeters.
     max_sag_error_mm: f32,
 
@@ -57,19 +63,29 @@ impl SphereTessellationOperator {
     /// # Arguments
     /// * `sphere_data` - The sphere data to use for the tessellation.
     /// * `tessellation_options` - The tessellation options to use for the tessellation.
-    pub fn new(sphere_data: &SphereData, tessellation_options: &TessellationOptions) -> Self {
+    /// * `transform` - The transformation matrix to apply to the sphere.
+    pub fn new(
+        sphere_data: &SphereData,
+        tessellation_options: &TessellationOptions,
+        transform: Mat3,
+    ) -> Self {
         let radius_mm = sphere_data.diameter() / 2.0;
 
+        let max_sag_error_mm = tessellation_options.max_sag.get_unit_in_millimeters() as f32;
+
+        // Determine the maximum edge length based on the radius and tessellation options.
+        // Include the spectral norm of the transformation matrix to account for the distortion
+        // caused by the transformation.
+        let s = compute_spectral_norm(&transform);
         let max_edge_length_mm = Self::determine_maximum_edge_length(
-            Length::new(radius_mm as f64 * 1e-3f64),
+            Length::new((radius_mm * s) as f64 * 1e-3f64),
             tessellation_options,
         );
-
-        let max_sag_error_mm = tessellation_options.max_sag.get_unit_in_millimeters() as f32;
 
         Self {
             radius_mm,
             max_edge_length_mm,
+            transform,
             max_sag_error_mm,
             map_edge_middle_vertex: HashMap::new(),
             mesh_builder: MeshBuilder::new(),
@@ -80,9 +96,8 @@ impl SphereTessellationOperator {
     /// Function may only be called once.
     ///
     /// # Arguments
-    /// * `transform` - The transformation matrix to apply to the sphere.
     /// * `translation` - The translation vector to apply to the sphere.
-    pub fn tessellate(&mut self, transform: &Mat3, translation: &Vec3) {
+    pub fn tessellate(&mut self, translation: &Vec3) {
         assert!(
             self.mesh_builder.is_empty(),
             "Tesselation has already been performed."
@@ -94,7 +109,8 @@ impl SphereTessellationOperator {
         // create the indices of the tessellated sphere
         self.create_indices();
 
-        self.mesh_builder.transform_vertices(transform, translation);
+        self.mesh_builder
+            .transform_vertices(&self.transform, translation);
     }
 
     /// Converts the tessellated sphere into a mesh object.
@@ -338,10 +354,11 @@ mod test {
                                 diameter: r_mm * 2f32,
                             },
                             &options,
+                            Mat3::identity(),
                         );
 
                         // tessellate and get mesh
-                        op.tessellate(&Mat3::identity(), &Vec3::zeros());
+                        op.tessellate(&Vec3::zeros());
                         let mesh = op.into_mesh();
 
                         println!(
